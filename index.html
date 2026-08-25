@@ -404,6 +404,7 @@ const ICON = {
       moonPhase: 0,         // 0..1（最高到達段に応じて満ちる）
       weather: 0, wxT: 0,   // 天候の番号と、切り替え表示の残り
       order: null,           // その回の御霊の並び（毎回シャッフルする）
+      test: false, immortal: true,   // テストモード（記録は保存しない）
       charX: 0, charOff: 0,  // キャラの位置。charOff は「台座の中心からのずれ」で、
                              // 揺れる台座に乗って一緒に動くために保つ
       overReason: ""
@@ -451,6 +452,7 @@ const ICON = {
     ripples.length = 0; swap.t = 0;
     state.charX = STAND_X; state.charOff = 0; state.camX = 0;
     state.order = shuffled(IDS);   // 毎回ちがう御霊から始まり、ちがう順で出る
+    state.test = testMode;
     if (DBG.wx !== undefined) state.weather = parseInt(DBG.wx, 10) || 0;
   }
 
@@ -504,6 +506,11 @@ const ICON = {
       var short = j.x1 < platX(s.plats[1]);
       s.overReason = short ? "届かなかった" : "跳びすぎた";
       se("whiff", 1.0);   // 届かない/跳びすぎで音を変えない（差が大きすぎたため）
+      if (s.test && s.immortal) {         // 試しモードの不死: 落ちずに元の台座へ戻す
+        s.charX = platX(s.plats[0]) + s.charOff;
+        s.combo = 0; flash(short ? "届かず" : "跳びすぎ", C.shokko);
+        return;
+      }
       startFall(j.x1, short);             // 即終了せず、画面の下まで落として見せる
       return;
     }
@@ -675,23 +682,110 @@ const ICON = {
   function gameOver() {
     var s = state;
     s.phase = "result";
-    if (s.step > best) { best = s.step; save("tsukikage_best", String(best)); s.newBest = true; }
-    if (s.maxCombo > bestCombo) { bestCombo = s.maxCombo; save("tsukikage_best_combo", String(bestCombo)); }
+    if (!s.test) {   // 試しモードの記録は残さない（BESTを汚さない）
+      if (s.step > best) { best = s.step; save("tsukikage_best", String(best)); s.newBest = true; }
+      if (s.maxCombo > bestCombo) { bestCombo = s.maxCombo; save("tsukikage_best_combo", String(bestCombo)); }
+    }
     se("end", 0.8);
     setTimeout(function () { voice(resultVoiceKey(s.step)); }, 420);
     lockUntil = performance.now() + 700;
     if (DBG.stat) console.log("[stat]", JSON.stringify(statLog));
   }
 
+  // ---- テストモード ----
+  // 入り方: タイトル画面を1.5秒以内に3回タップ（既存2作の「稽古」と同じ流儀）。
+  // 目的は「遊びながら各要素を確かめる」こと。**記録は一切保存しない**
+  // （式札かさねで稽古モードがBESTを汚した件の再発防止）。
+  var testMode = false, titleTaps = [];
+  function tryEnterTest(now) {
+    titleTaps = titleTaps.filter(function (t) { return now - t < 1500; });
+    titleTaps.push(now);
+    if (titleTaps.length >= 3) {
+      titleTaps = [];
+      testMode = !testMode;
+      flash(testMode ? "試し" : "試し おわり", C.shokko);
+      return true;
+    }
+    return false;
+  }
+
+  // 画面下のボタン列（テストモードのときだけ出す）
+  function testButtons() {
+    var labels = ["天候", "+10段", "御霊", "声", state.immortal ? "不死 入" : "不死 切"];
+    var w = W / labels.length, y = H - 52;
+    return labels.map(function (t, i) { return { t: t, x: i * w, y: y, w: w, h: 52, i: i }; });
+  }
+  function drawTestBar(s) {
+    if (!s.test) return;
+    ctx.save();
+    ctx.fillStyle = "rgba(10,10,20,.82)"; ctx.fillRect(0, H - 52, W, 52);
+    ctx.strokeStyle = "rgba(224,86,47,.55)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, H - 52); ctx.lineTo(W, H - 52); ctx.stroke();
+    ctx.textAlign = "center";
+    testButtons().forEach(function (b) {
+      ctx.fillStyle = C.ink; ctx.font = "700 15px 'Shippori Mincho B1',serif";
+      ctx.fillText(b.t, b.x + b.w / 2, H - 20);
+      if (b.i > 0) {
+        ctx.strokeStyle = "rgba(232,228,216,.16)";
+        ctx.beginPath(); ctx.moveTo(b.x, H - 44); ctx.lineTo(b.x, H - 10); ctx.stroke();
+      }
+    });
+    // 記録が残らないことを明示する
+    ctx.textAlign = "left";
+    ctx.fillStyle = C.shokko; ctx.font = "700 13px 'Shippori Mincho B1',serif";
+    ctx.fillText("試し（記録は残りません）", 14, H - 62);
+    ctx.restore();
+  }
+  var voiceCycle = 0;
+  function hitTestBar(x, y) {
+    if (!state.test || y < H - 52) return false;
+    var b = testButtons().filter(function (b) { return x >= b.x && x < b.x + b.w; })[0];
+    if (!b) return false;
+    var s = state;
+    if (b.i === 0) {                                   // 天候を回す
+      s.weather = (s.weather + 1) % WEATHER.length; s.wxT = 1.0;
+    } else if (b.i === 1) {                            // 段を進める
+      var prev = s.step; s.step += 10;
+      for (var k = 0; k < 10; k++) { s.plats.shift(); pushPlat(s); }
+      s.charOff = 0; s.charX = platX(s.plats[0]);
+      s.moonPhase = Math.max(s.moonPhase, Math.min(s.step / 50, 1));
+      if (Math.floor(s.step / SWAP_EVERY) > Math.floor(prev / SWAP_EVERY)) { s.charIdx++; showSwap(currentChar()); }
+      flash(s.step + "段", C.kindei);
+    } else if (b.i === 2) {                            // 次の御霊のカットインを見る
+      s.charIdx++; showSwap(currentChar());
+    } else if (b.i === 3) {                            // 台詞を順に鳴らす
+      var keys = ["start", "r0", "r1", "r2", "r3", "r4"];
+      var k2 = keys[voiceCycle % keys.length]; voiceCycle++;
+      voice(k2); flash("声 " + k2, C.anshi);
+    } else {                                           // 落ちない/落ちるの切替
+      s.immortal = !s.immortal;
+    }
+    return true;
+  }
+
   // ---- 入力 ----
+  var lastPointer = { x: 0, y: 0 };
   function down(e) {
     if (e.cancelable) e.preventDefault();
+    if (typeof e.clientX === "number") {
+      var r = cv.getBoundingClientRect();
+      lastPointer.x = (e.clientX - r.left) / r.width * W;
+      lastPointer.y = (e.clientY - r.top) / r.height * H;
+    }
     var now = performance.now();
     if (now < lockUntil) return;
     audioCtx();
     var s = state;
+    if (s.phase === "play" && hitTestBar(lastPointer.x, lastPointer.y)) return;   // 試しのボタン
     // reset() は state を作り直すので、phase は必ず新しい state 側に立てる（古い s に書くと始まらない）
-    if (s.phase === "title") { reset(); state.phase = "play"; startBGM(); voice("start"); return; }
+    if (s.phase === "title") {
+      // 題字の上を1.5秒以内に3回タップしたときだけ試しモードを出入りする。
+      // 画面全体を対象にすると、1回目のタップでゲームが始まってしまう（既存2作もロゴ限定）
+      var onTitle = Math.abs(lastPointer.x - W / 2) < 130 &&
+                    lastPointer.y > 232 && lastPointer.y < 292;
+      if (onTitle) { tryEnterTest(now); return; }
+      reset(); state.phase = "play"; startBGM(); voice("start"); return;
+    }
     if (s.phase === "result") { reset(); state.phase = "play"; return; }
     if (s.phase === "play" && !s.jump) { s.charging = true; s.chargeStart = now; }
   }
@@ -1014,6 +1108,10 @@ const ICON = {
     ctx.fillStyle = C.ink; ctx.font = "700 18px 'Shippori Mincho B1',serif";
     ctx.globalAlpha = 0.55 + Math.sin(performance.now() / 380) * 0.35;
     ctx.fillText("画面を長押し", W / 2, 610);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = testMode ? C.shokko : "rgba(157,147,181,.5)";
+    ctx.font = "600 12px 'Shippori Mincho B1',serif";
+    ctx.fillText(testMode ? "試しモード（題字を3回タップで戻る）" : "題字を3回すばやくタップで試しモード", W / 2, 656);
     ctx.restore();
   }
 
@@ -1108,6 +1206,7 @@ const ICON = {
     drawSwap(dt, 1);
     if (s.phase === "play") drawWeatherSwap(s, dt);
     drawFlash(s, dt);
+    drawTestBar(s);
     if (s.phase === "title") drawTitle();
     if (s.phase === "result") drawResult(s);
 
