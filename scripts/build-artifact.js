@@ -23,6 +23,13 @@ const bg = {
   near: "data:image/webp;base64," + b64("assets/art/bg-near.webp"),
 };
 
+// ボイス（あれば埋め込む。無ければ空のまま＝鳴らないだけ）
+const voice = {};
+for (const k of ["start", "r0", "r1", "r2", "r3", "r4"]) {
+  const f = path.join(root, "assets", "voice", `shiori_${k}.m4a`);
+  if (fs.existsSync(f)) voice[k] = fs.readFileSync(f).toString("base64");
+}
+
 // page.html から <style> と本文だけを取り出す（head/body は公開時に付く）
 const page = read("src/page.html");
 const style = page.match(/<style>([\s\S]*?)<\/style>/)[1];
@@ -42,6 +49,7 @@ ${style}
 window.AUDIO_DATA = ${JSON.stringify(audio)};
 window.BGM_DATA = ${JSON.stringify(bgm)};
 window.BG_DATA = ${JSON.stringify(bg)};
+window.VOICE_DATA = ${JSON.stringify(voice)};
 </script>
 <script>
 ${read("src/chars.js")}

@@ -278,7 +278,7 @@ const ICON = {
   });
 
   // ---- 音（Pages版は別ファイル、Artifact版は AUDIO_DATA に差し替わる）----
-  var SE_NAMES = ["start", "count", "zan", "kiwami", "bomb", "fukaku", "whiff", "combo", "end"];
+  var SE_NAMES = ["zan", "kiwami", "fukaku", "whiff", "end", "koto", "koto_high"];
   var actx = null, seBuf = {}, bgmEl = null, muted = false;
   function audioCtx() {
     if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { } }
@@ -312,6 +312,45 @@ const ICON = {
       s.connect(g); g.connect(a.destination); s.start(0);
     } catch (e) { }
   }
+  // ---- ボイス（栞・公式指定のElevenLabs Voice ID で制作）----
+  // 台詞は docs/VOICE.md。音源が無ければ黙って何も鳴らさない（差し替え前でも遊べる）
+  var VOICE_KEYS = ["start", "r0", "r1", "r2", "r3", "r4"];
+  var voiceBuf = {}, voicePlaying = null;
+  function loadVoice() {
+    var a = audioCtx(); if (!a) return;
+    VOICE_KEYS.forEach(function (k) {
+      var got = function (ab) { a.decodeAudioData(ab, function (b) { voiceBuf[k] = b; }, function () { }); };
+      if (window.VOICE_DATA && window.VOICE_DATA[k]) { got(b64ToBuf(window.VOICE_DATA[k])); return; }
+      fetch("assets/voice/shiori_" + k + ".m4a").then(function (r) {
+        if (!r.ok) throw 0; return r.arrayBuffer();
+      }).then(got).catch(function () { });
+    });
+  }
+  function voice(key) {
+    if (muted) return;
+    var a = audioCtx(); if (!a || !voiceBuf[key]) return;
+    try {
+      if (voicePlaying) { try { voicePlaying.stop(); } catch (e) { } }
+      var src = a.createBufferSource(); src.buffer = voiceBuf[key];
+      var g = a.createGain(); g.gain.value = 1.0;      // 声 > SE > BGM（MEDIA.md）
+      src.connect(g); g.connect(a.destination); src.start(0);
+      voicePlaying = src;
+      if (bgmGain) {                                   // 声の間はBGMを下げる
+        bgmGain.gain.value = 0.07;
+        setTimeout(function () { if (bgmGain && !document.hidden) bgmGain.gain.value = 0.16; },
+                   Math.min(src.buffer.duration * 1000 + 250, 8000));
+      }
+    } catch (e) { }
+  }
+  // 到達段数から、結果で読む台詞を選ぶ
+  function resultVoiceKey(step) {
+    if (step >= 50) return "r4";
+    if (step >= 38) return "r3";
+    if (step >= 22) return "r2";
+    if (step >= 10) return "r1";
+    return "r0";
+  }
+
   var bgmSrc = null, bgmGain = null, bgmBuf = null;
   function startBGM() {
     if (muted || bgmEl || bgmSrc) return;
@@ -449,7 +488,7 @@ const ICON = {
     var peak = 118 + dist * 0.30;
 
     s.jump = { t: 0, dur: dur, x0: s.charX, x1: landX, peak: peak, dist: dist, next: next };
-    se("zan", 0.8);
+    se("zan", 0.75);
     if (DBG.stat) statLog.push({ step: s.step, held: +held.toFixed(3), dist: Math.round(dist), target: Math.round(next.x - cur.x) });
   }
 
@@ -464,7 +503,7 @@ const ICON = {
     if (hit < 0) {                        // どの台座にも乗れなかった
       var short = j.x1 < platX(s.plats[1]);
       s.overReason = short ? "届かなかった" : "跳びすぎた";
-      se(short ? "whiff" : "bomb", 1.0);
+      se("whiff", 1.0);   // 届かない/跳びすぎで音を変えない（差が大きすぎたため）
       startFall(j.x1, short);             // 即終了せず、画面の下まで落として見せる
       return;
     }
@@ -485,12 +524,12 @@ const ICON = {
         bag.push(wi); if (wi === 0) bag.push(0);   // 月夜は2枚
       }
       s.weather = bag[Math.floor(Math.random() * bag.length)];
-      s.wxT = 1.0; se("count", 0.7);
+      s.wxT = 1.0;
     }
 
     if (skipped > 0) {                    // 台座を飛び越した
       flash(skipped === 1 ? "一つ飛ばし" : skipped + "つ飛ばし", C.shokko);
-      se("bomb", 0.5);
+      se("koto_high", 0.85);
       s.combo += skipped;                 // 思い切りの分だけ連が伸びる
       s.maxCombo = Math.max(s.maxCombo, s.combo);
     }
@@ -500,16 +539,15 @@ const ICON = {
       s.combo++;
       s.maxCombo = Math.max(s.maxCombo, s.combo);
       flash("会心", C.moon);
-      se("kiwami", 0.55);        // 会心は「極」。跳躍（斬）と区別する
-      if (s.combo >= 2) se("combo", Math.min(0.45 + s.combo * 0.06, 0.95));
+      // 会心は既存2作と同じ琴のワンショット。連が伸びたら高い方に変える
+      se(s.combo >= 3 ? "koto_high" : "koto", 0.9);
     } else {
-      s.combo = 0;
-      se("count", 0.55);
+      s.combo = 0;      // 通常の着地は無音（音を足しすぎない）
     }
     // 節目（10段ごと）
-    if (Math.floor(s.step / 10) > Math.floor(prevStep / 10)) { se("fukaku", 0.85); flash(s.step + "段", C.kindei); }
+    if (Math.floor(s.step / 10) > Math.floor(prevStep / 10)) { flash(s.step + "段", C.kindei); }
     // 5段ごとに御霊が交代する（34体を巡回＝素材がそのまま尺になる）
-    if (Math.floor(s.step / SWAP_EVERY) > Math.floor(prevStep / SWAP_EVERY)) { s.charIdx++; showSwap(currentChar()); se("zan", 0.55); }
+    if (Math.floor(s.step / SWAP_EVERY) > Math.floor(prevStep / SWAP_EVERY)) { s.charIdx++; showSwap(currentChar()); }
     // 満月（50段）
     if (prevStep < 50 && s.step >= 50) { flash("満月成就", C.moon); se("kiwami", 1.0); }
     s.moonPhase = Math.max(s.moonPhase, Math.min(s.step / 50, 1));
@@ -640,6 +678,7 @@ const ICON = {
     if (s.step > best) { best = s.step; save("tsukikage_best", String(best)); s.newBest = true; }
     if (s.maxCombo > bestCombo) { bestCombo = s.maxCombo; save("tsukikage_best_combo", String(bestCombo)); }
     se("end", 0.8);
+    setTimeout(function () { voice(resultVoiceKey(s.step)); }, 420);
     lockUntil = performance.now() + 700;
     if (DBG.stat) console.log("[stat]", JSON.stringify(statLog));
   }
@@ -652,8 +691,8 @@ const ICON = {
     audioCtx();
     var s = state;
     // reset() は state を作り直すので、phase は必ず新しい state 側に立てる（古い s に書くと始まらない）
-    if (s.phase === "title") { reset(); state.phase = "play"; se("start", 0.9); startBGM(); return; }
-    if (s.phase === "result") { reset(); state.phase = "play"; se("start", 0.9); return; }
+    if (s.phase === "title") { reset(); state.phase = "play"; startBGM(); voice("start"); return; }
+    if (s.phase === "result") { reset(); state.phase = "play"; return; }
     if (s.phase === "play" && !s.jump) { s.charging = true; s.chargeStart = now; }
   }
   function up(e) {
@@ -1083,6 +1122,7 @@ const ICON = {
   reset();
   state.phase = "title";
   loadSE();
+  loadVoice();
   requestAnimationFrame(frame);
 
   // 検証用に外へ出す
