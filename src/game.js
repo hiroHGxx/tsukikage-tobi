@@ -38,6 +38,17 @@
   ];
   var WEATHER_EVERY = 8;   // 何段ごとに変わるか
 
+  // 御霊の肩書き（公式MCP list_spirits の tagline）
+  var TAGS = {
+    anne: "伊賀・木", arujidono: "境を守った一族の生き残り", atoza: "風魔・金", aun: "風魔・土",
+    benten: "雑賀・水", dan: "風魔・金", emma: "甲賀・金", hinanojo: "雑賀・火", izuna: "甲賀・金",
+    janome: "風魔・木", karma: "風魔・火", karura: "伊賀・水", kohaku: "風魔・火", magoichi: "雑賀・火",
+    naruka: "伊賀・木", nekomata: "雑賀・金", nemu: "甲賀・水", oen: "甲賀・土", orochi: "風魔・水",
+    oto: "甲賀・土", rotton: "風魔・木", sakuya: "甲賀・火", shiba: "雑賀・水", shinra: "根の国・土",
+    shion: "伊賀・木", shiori: "道しるべの御霊", tart: "甲賀・水", torika: "伊賀・木", uka: "甲賀・火",
+    xiaolan: "甲賀・土", yui: "伊賀・火"
+  };
+
   // ---- 称号（到達段数）----
   var TITLES = [
     { n: 0, t: "宵の踏み出し" }, { n: 5, t: "石渡り" }, { n: 10, t: "夜歩き" },
@@ -100,7 +111,7 @@
   }
 
   // ---- 画像 ----
-  var imgs = {}, icons = {}, imgReady = 0;
+  var imgs = {}, icons = {}, canons = {}, imgReady = 0;
   IDS.forEach(function (id) {
     var im = new Image();
     im.onload = function () { imgReady++; };
@@ -108,6 +119,7 @@
     im.src = CHIBI[id];
     imgs[id] = im;
     if (typeof ICON !== "undefined" && ICON[id]) { var ic = new Image(); ic.src = ICON[id]; icons[id] = ic; }
+    if (typeof CANON !== "undefined" && CANON[id]) { var cn = new Image(); cn.src = CANON[id]; canons[id] = cn; }
   });
 
   // ---- 音（Pages版は別ファイル、Artifact版は AUDIO_DATA に差し替わる）----
@@ -367,29 +379,55 @@
   // 御霊の交代を見せる（顔アイコン＋名前＋重い/軽い）
   var swap = { t: 0, id: null };
   function showSwap(id) { swap.t = 1.0; swap.id = id; }
-  function drawSwap(dt) {
+  function drawSwap(dt, layer) {
     if (swap.t <= 0) return;
-    swap.t = Math.max(0, swap.t - dt * 0.7);
-    var a = Math.min(swap.t * 2.4, 1);
-    var ic = icons[swap.id];
+    if (layer === 1) swap.t = Math.max(0, swap.t - dt * 0.62);
+    var id = swap.id;
+    var art = canons[id], ic = icons[id];
+    var p = 1 - swap.t;                       // 0→1
+    var appear = Math.min(p / 0.16, 1);       // 出るのは速く
+    var fade = swap.t < 0.24 ? swap.t / 0.24 : 1;
+    var ease = 1 - Math.pow(1 - appear, 3);
+
     ctx.save();
-    ctx.globalAlpha = a;
-    var cx = W / 2, cy = 168;
-    if (ic && ic.complete && ic.naturalWidth) {
-      var r = 44;
+    ctx.globalAlpha = fade;
+    if (layer === 0) {   // 背後の層（石垣より後ろに描く）
+
+    // 立ち絵は右から差し込む。無い御霊（栞・あるじどの・結）は顔アイコンで代える
+    if (art && art.complete && art.naturalWidth) {
+      var ah = 300, aw = ah * (art.naturalWidth / art.naturalHeight);
+      var ax = W - aw * 0.80 + (1 - ease) * 90;
+      var ay = GROUND_Y - ah + 26;
+      // 背後に金の帯（立ち絵を宵闇から起こす）
+      var band = ctx.createLinearGradient(ax - 40, 0, ax + aw, 0);
+      band.addColorStop(0, "rgba(240,206,126,0)");
+      band.addColorStop(0.45, "rgba(240,206,126,.13)");
+      band.addColorStop(1, "rgba(240,206,126,0)");
+      ctx.fillStyle = band; ctx.fillRect(0, ay - 10, W, ah + 20);
+      ctx.globalAlpha = fade * (0.35 + 0.65 * ease);
+      ctx.drawImage(art, ax, ay, aw, ah);
+      ctx.globalAlpha = fade;
+    } else if (ic && ic.complete && ic.naturalWidth) {
+      var r = 46, cx0 = W - 96 + (1 - ease) * 60, cy0 = GROUND_Y - 190;
       ctx.save();
-      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.closePath(); ctx.clip();
-      ctx.drawImage(ic, cx - r, cy - r, r * 2, r * 2);
+      ctx.beginPath(); ctx.arc(cx0, cy0, r, 0, Math.PI * 2); ctx.clip();
+      ctx.drawImage(ic, cx0 - r, cy0 - r, r * 2, r * 2);
       ctx.restore();
-      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(240,206,126,.8)"; ctx.lineWidth = 2; ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx0, cy0, r, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(240,206,126,.75)"; ctx.lineWidth = 2; ctx.stroke();
     }
-    ctx.textAlign = "center";
-    ctx.fillStyle = C.ink; ctx.font = "700 21px 'Shippori Mincho B1',serif";
-    ctx.fillText(NAMES[swap.id] || swap.id, cx, cy + 74);
-    ctx.fillStyle = C.kindei;
-    ctx.font = "600 14px 'Shippori Mincho B1',serif";
-    ctx.fillText("交代", cx, cy + 98);
+      ctx.restore(); return;
+    }
+
+    // 名前は左側に縦の金線を添えて置く（立ち絵とぶつからない位置）
+    var tx = 30 - (1 - ease) * 16;
+    ctx.textAlign = "left";
+    ctx.strokeStyle = "rgba(240,206,126,.7)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(tx - 10, GROUND_Y - 168); ctx.lineTo(tx - 10, GROUND_Y - 104); ctx.stroke();
+    ctx.fillStyle = C.ink; ctx.font = "800 30px 'Shippori Mincho B1',serif";
+    ctx.fillText(NAMES[id] || id, tx, GROUND_Y - 132);
+    ctx.fillStyle = C.kindei; ctx.font = "600 15px 'Shippori Mincho B1',serif";
+    ctx.fillText(TAGS[id] || "", tx, GROUND_Y - 110);
     ctx.restore();
   }
 
@@ -698,9 +736,9 @@
     ctx.globalAlpha = Math.min(s.wxT * 2.2, 1) * 0.95;
     ctx.textAlign = "center";
     ctx.fillStyle = w.color; ctx.font = "800 40px 'Shippori Mincho B1',serif";
-    ctx.fillText(w.name, W / 2, 246);
+    ctx.fillText(w.name, W / 2, 168);
     ctx.fillStyle = C.ink; ctx.font = "600 17px 'Shippori Mincho B1',serif";
-    ctx.fillText(w.note, W / 2, 276);
+    ctx.fillText(w.note, W / 2, 196);
     ctx.restore();
   }
 
@@ -712,7 +750,7 @@
     ctx.textAlign = "center";
     ctx.fillStyle = s.flashColor;
     ctx.font = "800 34px 'Shippori Mincho B1',serif";
-    ctx.fillText(s.flashText, W / 2, 302 - (1 - s.flash) * 26);
+    ctx.fillText(s.flashText, W / 2, 232 - (1 - s.flash) * 22);
     ctx.restore();
   }
 
@@ -789,6 +827,7 @@
     }
 
     drawBg(s);
+    drawSwap(dt, 0);
     for (var i = 0; i < s.plats.length; i++) drawPlat(s.plats[i], s.camX, i === 0 ? 0 : perfectWinFor(s.step + i));
 
     var px = s.charX - s.camX, py = GROUND_Y;
@@ -812,7 +851,7 @@
     drawRipples(dt, s.camX);
     if (s.phase === "play" || s.phase === "fall") drawWeatherFx(s, dt);
     if (s.phase === "play" || s.phase === "fall") drawHud(s);
-    drawSwap(dt);
+    drawSwap(dt, 1);
     if (s.phase === "play") drawWeatherSwap(s, dt);
     drawFlash(s, dt);
     if (s.phase === "title") drawTitle();
@@ -832,5 +871,5 @@
   requestAnimationFrame(frame);
 
   // 検証用に外へ出す
-  window.__tsukikage = { get state() { return state; }, get best() { return best; }, stat: function () { return statLog; } };
+  window.__tsukikage = { get state() { return state; }, get best() { return best; }, get swap() { return swap; }, stat: function () { return statLog; } };
 })();

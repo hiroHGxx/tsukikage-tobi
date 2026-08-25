@@ -11,6 +11,7 @@
 """
 import base64, io, json, os, subprocess, sys
 from PIL import Image
+import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from extract_chibi import extract_front
 
@@ -56,6 +57,34 @@ def main():
         # 透過つきWebPで持つ（同じ絵でPNGの4分の1以下になる。単一HTMLの重さに直結するため）
         img.save(buf, "WEBP", quality=82, method=6, exact=False)
         out[cid] = "data:image/webp;base64," + base64.b64encode(buf.getvalue()).decode()
+    # 正典立ち絵（白背景の全身イラスト）。御霊が交代するときに大きく出す。
+    # 背景は白なので、外側とつながった白だけを塗り抜く（衣装の白を残すため）。
+    from extract_chibi import ndimage as _nd
+    canon = {}
+    for a in [x for x in items if x.get("id","").endswith("_canon")]:
+        cid = a["char"]
+        if cid not in out: continue
+        src = fetch(a["url"], os.path.join(CACHE, f"{cid}_canon.png"))
+        if src is None: continue
+        im = Image.open(src).convert("RGBA")
+        arr = np.array(im).astype(int)
+        h0, w0 = arr.shape[:2]
+        corners = np.array([arr[2,2,:3], arr[2,w0-3,:3], arr[h0-3,2,:3], arr[h0-3,w0-3,:3]])
+        bg = np.median(corners, axis=0)
+        same = np.abs(arr[:,:,:3] - bg).sum(axis=2) < 40
+        lab, n = _nd.label(same)
+        border = set(np.unique(np.concatenate([lab[0,:], lab[-1,:], lab[:,0], lab[:,-1]])))
+        border.discard(0)
+        outside = np.isin(lab, list(border))
+        px = np.array(im)
+        px[:,:,3] = np.where(outside, 0, 255).astype(np.uint8)
+        ys, xs = np.where(~outside)
+        if not len(xs): continue
+        cut = Image.fromarray(px[ys.min():ys.max()+1, xs.min():xs.max()+1], "RGBA")
+        cut.thumbnail((360, 380), Image.LANCZOS)
+        b = io.BytesIO(); cut.save(b, "WEBP", quality=76, method=6)
+        canon[cid] = "data:image/webp;base64," + base64.b64encode(b.getvalue()).decode()
+
     # 顔アイコン（透過・そのまま使える）も小さくして持つ。御霊の交代表示に使う。
     icons = {}
     for a in [x for x in items if x.get("id","").endswith("_icon")]:
@@ -77,12 +106,16 @@ def main():
         for cid, uri in out.items():
             f.write(f'  {cid}: "{uri}",\n')
         f.write("};\n")
+        f.write("const CANON = {\n")
+        for cid, uri in canon.items():
+            f.write(f'  {cid}: "{uri}",\n')
+        f.write("};\n")
         f.write("const ICON = {\n")
         for cid, uri in icons.items():
             f.write(f'  {cid}: "{uri}",\n')
         f.write("};\n")
     total = os.path.getsize(js)
-    print(f"生成: ちび{len(out)}体・顔{len(icons)}点 / {total/1024:.0f}KB → src/chars.js")
+    print(f"生成: ちび{len(out)}体・立ち絵{len(canon)}点・顔{len(icons)}点 / {total/1024:.0f}KB → src/chars.js")
     if skipped:
         print("切り出せなかったキャラ:", ", ".join(skipped))
 
