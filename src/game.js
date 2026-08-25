@@ -382,7 +382,11 @@
   }
   function updateFall(dt) {
     var s = state, f = s.fall;
+    var was = f.t;
     f.t += dt;
+    // 落ちていく音。外した瞬間の音（空振り／爆）だけだと、
+    // とくに「届かなかった」側は0.5秒の軽い音で終わって無音に感じる（2026-08-25 指摘）
+    if (was < 0.22 && f.t >= 0.22) se("fukaku", 0.6);
     f.vy += 1500 * dt;               // 重力
     f.x += f.vx * dt;
     f.y += f.vy * dt;
@@ -601,11 +605,16 @@
     var t = performance.now() / 1000;
     ctx.save();
     if (w.id === "ame") {
-      ctx.strokeStyle = "rgba(150,215,245,.62)"; ctx.lineWidth = 1.6;
+      // 右上から左下へ降らせる（跳ぶ向き＝右に逆らう「向かい風」に見せる）。
+      // 速さは落ち着かせる。粒ごとに種を持たせて、横も縦もなめらかに流す。
+      ctx.strokeStyle = "rgba(160,220,248,.66)"; ctx.lineWidth = 1.7;
+      ctx.lineCap = "round";
       for (var i = 0; i < 72; i++) {
-        var x = (i * 113 + (t * 620) % 97) % (W + 60) - 30;
-        var y = (i * 71 + t * 900) % (H + 80) - 40;
-        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 8, y + 26); ctx.stroke();
+        var seed = i * 137.5;
+        var fall = 520 + (i % 5) * 26;                        // 粒ごとに少し速さを変える
+        var y = ((seed * 7.3 + t * fall) % (H + 140)) - 70;
+        var x = ((seed * 31.7 - t * fall * 0.34) % (W + 160) + (W + 160)) % (W + 160) - 80;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 10, y + 30); ctx.stroke();
       }
     } else {
       ctx.strokeStyle = "rgba(240,206,126,.20)"; ctx.lineWidth = 1.2;
