@@ -62,6 +62,9 @@ async function run(base, hash, until, timeout, shot) {
       until: "window.__tsukikage.state.step >= 50", timeout: 180000, shot: "/tmp/tsukikage-moon.png" },
     { name: "中盤の見た目（17段・天候あり）", hash: "#autoperfect",
       until: "window.__tsukikage.state.step >= 17", timeout: 90000, shot: "/tmp/tsukikage-mid.png" },
+    { name: "外したときの落下（画面下へ落ちる）", hash: "#automiss",
+      until: "window.__tsukikage.state.phase === 'fall' && window.__tsukikage.state.fall && window.__tsukikage.state.fall.y > 520",
+      timeout: 30000, shot: "/tmp/tsukikage-fall.png" },
     { name: "わざと外して夜明け（結果画面）", hash: "#automiss",
       until: "window.__tsukikage.state.phase === 'result'", timeout: 30000, shot: "/tmp/tsukikage-over.png" },
   ];

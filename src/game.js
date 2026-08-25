@@ -185,6 +185,7 @@
   function newState() {
     return {
       phase: "title",       // title | play | fall | result
+      fall: null,           // 台座を外したときの落下（外れたことが見えるように落として見せる）
       step: 0,              // 到達段数
       combo: 0, maxCombo: 0,
       charIdx: 0,
@@ -277,9 +278,10 @@
     var half = next.w / 2;
 
     if (d > half) {                       // 台座を外した
-      s.overReason = (j.x1 < platX(next)) ? "届かなかった" : "跳びすぎた";
-      se(j.x1 < platX(next) ? "whiff" : "bomb", 1.0);
-      gameOver();
+      var short = j.x1 < platX(next);
+      s.overReason = short ? "届かなかった" : "跳びすぎた";
+      se(short ? "whiff" : "bomb", 1.0);
+      startFall(j.x1, short);             // 即終了せず、画面の下まで落として見せる
       return;
     }
     s.step++;
@@ -315,6 +317,31 @@
     // 満月（50段）
     if (s.step === 50) { flash("満月成就", C.moon); se("kiwami", 1.0); }
     s.moonPhase = Math.max(s.moonPhase, Math.min(s.step / 50, 1));
+  }
+
+  // 台座を外したときの落下。何が起きたのか見えないまま終わると、
+  // 「外れたのかどうか分からない」ままになる（2026-08-25 指摘）。
+  function startFall(x, short) {
+    var s = state;
+    s.phase = "fall";
+    s.charX = x;
+    s.fall = {
+      x: x, y: GROUND_Y,
+      vx: short ? -12 : 26,          // 手前に落ちたか、行き過ぎたかで流れる向きが変わる
+      vy: -60,                       // つま先が一度かかって、そこから落ちる感じ
+      rot: 0, rv: (short ? -1 : 1) * (0.9 + Math.random() * 0.7),
+      t: 0
+    };
+  }
+  function updateFall(dt) {
+    var s = state, f = s.fall;
+    f.t += dt;
+    f.vy += 1500 * dt;               // 重力
+    f.x += f.vx * dt;
+    f.y += f.vy * dt;
+    f.rot += f.rv * dt;
+    if (f.t > 0.28 && f.t < 0.34) se("fukaku", 0.85);
+    if (f.y > H + 160) { s.fall = null; gameOver(); }
   }
 
   function flash(text, color) { state.flash = 1.0; state.flashText = text; state.flashColor = color; }
@@ -371,8 +398,7 @@
     s.phase = "result";
     if (s.step > best) { best = s.step; save("tsukikage_best", String(best)); s.newBest = true; }
     if (s.maxCombo > bestCombo) { bestCombo = s.maxCombo; save("tsukikage_best_combo", String(bestCombo)); }
-    se("fukaku", 0.9);
-    setTimeout(function () { se("end", 0.8); }, 260);
+    se("end", 0.8);
     lockUntil = performance.now() + 700;
     if (DBG.stat) console.log("[stat]", JSON.stringify(statLog));
   }
@@ -601,6 +627,18 @@
     }
   }
 
+  function drawFallingChar(s) {
+    var f = s.fall, id = currentChar(), im = imgs[id];
+    if (!im || !im.complete || !im.naturalWidth) return;
+    var hgt = 108, w = hgt * (im.naturalWidth / im.naturalHeight);
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, 1 - Math.max(0, (f.y - H * 0.6) / (H * 0.55)));
+    ctx.translate(f.x - s.camX, f.y - hgt / 2);
+    ctx.rotate(f.rot);
+    ctx.drawImage(im, -w / 2, -hgt / 2, w, hgt);
+    ctx.restore();
+  }
+
   function drawChargeRing(s, x) {
     if (!s.charging) return;
     var held = Math.min((performance.now() - s.chargeStart) / 1000, 1.0);
@@ -739,7 +777,13 @@
 
     // カメラは「キャラが STAND_X に来る位置」を目指すが、**跳んでいる間は動かさない**。
     // 弧とカメラの移動が混ざると、右へ跳んでいるのに一度左へ流れて見える（2026-08-25 指摘）。
-    if (!s.jump) {
+    // 落下中は原則カメラを止める（追いかけると「どこで外したのか」が画面から消える）。
+    // ただし大きく跳びすぎて画面の外に落ちる場合だけ、見える位置まで寄せる。
+    if (s.phase === "fall" && s.fall) {
+      var onScreen = s.fall.x - s.camX;
+      if (onScreen > W - 70) s.camX += (onScreen - (W - 70)) * Math.min(dt * 6, 1);
+      else if (onScreen < 40) s.camX += (onScreen - 40) * Math.min(dt * 6, 1);
+    } else if (!s.jump) {
       var targetCam = s.charX - STAND_X;
       s.camX += (targetCam - s.camX) * Math.min(dt * 14, 1);
     }
@@ -748,7 +792,10 @@
     for (var i = 0; i < s.plats.length; i++) drawPlat(s.plats[i], s.camX, i === 0 ? 0 : perfectWinFor(s.step + i));
 
     var px = s.charX - s.camX, py = GROUND_Y;
-    if (s.jump) {
+    if (s.phase === "fall" && s.fall) {
+      updateFall(dt);
+      if (s.fall) drawFallingChar(s);
+    } else if (s.jump) {
       s.jump.t += dt;
       var k = Math.min(s.jump.t / s.jump.dur, 1);
       var x = s.jump.x0 + (s.jump.x1 - s.jump.x0) * k;
@@ -763,8 +810,8 @@
     }
 
     drawRipples(dt, s.camX);
-    if (s.phase === "play") drawWeatherFx(s, dt);
-    if (s.phase === "play") drawHud(s);
+    if (s.phase === "play" || s.phase === "fall") drawWeatherFx(s, dt);
+    if (s.phase === "play" || s.phase === "fall") drawHud(s);
     drawSwap(dt);
     if (s.phase === "play") drawWeatherSwap(s, dt);
     drawFlash(s, dt);
