@@ -1,3 +1,4 @@
 assets/chars/
 node_modules/
 .DS_Store
+dist/

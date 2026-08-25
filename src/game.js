@@ -70,14 +70,35 @@
   }
   window.addEventListener("resize", resize);
 
+  // ---- 背景（遠景・近景。Artifact版は BG_DATA に差し替わる）----
+  var bgFar = new Image(), bgNear = new Image();
+  bgFar.src = (window.BG_DATA && window.BG_DATA.far) || "assets/art/bg-far.webp";
+  bgNear.src = (window.BG_DATA && window.BG_DATA.near) || "assets/art/bg-near.webp";
+  function ready(im) { return im.complete && im.naturalWidth > 0; }
+  // 背景を横に敷き詰める。1枚おきに左右反転させる（鏡張り）ので、
+  // 元画像の左右端が完全に一致していなくても継ぎ目が出ない。
+  function tileMirrored(im, scrollX, y, h) {
+    var w = im.naturalWidth * (h / im.naturalHeight);
+    var period = w * 2;
+    var base = -(((scrollX % period) + period) % period);
+    for (var x = base - period; x < W + period; x += period) {
+      ctx.drawImage(im, x, y, w, h);
+      ctx.save();
+      ctx.translate(x + w * 2, y); ctx.scale(-1, 1);
+      ctx.drawImage(im, 0, 0, w, h);
+      ctx.restore();
+    }
+  }
+
   // ---- 画像 ----
-  var imgs = {}, imgReady = 0;
+  var imgs = {}, icons = {}, imgReady = 0;
   IDS.forEach(function (id) {
     var im = new Image();
     im.onload = function () { imgReady++; };
     im.onerror = function () { imgReady++; };
     im.src = CHIBI[id];
     imgs[id] = im;
+    if (typeof ICON !== "undefined" && ICON[id]) { var ic = new Image(); ic.src = ICON[id]; icons[id] = ic; }
   });
 
   // ---- 音（Pages版は別ファイル、Artifact版は AUDIO_DATA に差し替わる）----
@@ -115,22 +136,41 @@
       s.connect(g); g.connect(a.destination); s.start(0);
     } catch (e) { }
   }
+  var bgmSrc = null, bgmGain = null, bgmBuf = null;
   function startBGM() {
-    if (bgmEl || muted) return;
+    if (muted || bgmEl || bgmSrc) return;
+    // Artifact版: 音声ファイルを置けず fetch(data:) も CSP で止まるため、
+    // 埋め込みの base64 を atob して WebAudio でループする（既存2作の教訓）。
+    if (window.BGM_DATA) {
+      var a = audioCtx(); if (!a) return;
+      var play = function (buf) {
+        try {
+          bgmBuf = buf;
+          bgmSrc = a.createBufferSource(); bgmSrc.buffer = buf; bgmSrc.loop = true;
+          bgmGain = a.createGain(); bgmGain.gain.value = 0.16;  // 声>SE>BGM の順（MEDIA.md）
+          bgmSrc.connect(bgmGain); bgmGain.connect(a.destination); bgmSrc.start(0);
+        } catch (e) { }
+      };
+      if (bgmBuf) { play(bgmBuf); return; }
+      a.decodeAudioData(b64ToBuf(window.BGM_DATA), play, function () { });
+      return;
+    }
     try {
-      bgmEl = new Audio(window.BGM_SRC || "assets/audio/bgm.m4a");
-      bgmEl.loop = true; bgmEl.volume = 0.16;   // 声>SE>BGM の順（MEDIA.md）
+      bgmEl = new Audio("assets/audio/bgm.m4a");
+      bgmEl.loop = true; bgmEl.volume = 0.16;
       bgmEl.play().catch(function () { });
     } catch (e) { }
   }
   document.addEventListener("visibilitychange", function () {
-    if (!bgmEl) return;
-    if (document.hidden) bgmEl.pause(); else bgmEl.play().catch(function () { });
+    // バックグラウンドでは止めて、戻ったら鳴らし直す（電池と「裏で鳴り続ける」対策）
+    if (bgmEl) { if (document.hidden) bgmEl.pause(); else bgmEl.play().catch(function () { }); return; }
+    if (!bgmGain) return;
+    try { bgmGain.gain.value = document.hidden ? 0 : 0.16; } catch (e) { }
   });
 
   // ---- 台座（式札の飛び石）----
-  var GROUND_Y = 520;       // 台座の上面
-  var STAND_X = 130;        // 足元の固定位置（カメラはここに合わせて流れる）
+  var GROUND_Y = 430;       // 台座の上面（画面の下1/3に沈まないよう上げた）
+  var STAND_X = 110;        // 足元の固定位置（カメラはここに合わせて流れる）
   var state, lockUntil = 0;
 
   function newState() {
@@ -150,27 +190,41 @@
     };
   }
 
-  // 段が進むほど「間が広く・幅が狭く」なる。会心の窓も少しずつ狭まるが、下限は切らない。
-  // 次の飛び石は必ず画面内に収まること（STAND_X=130 + 最大gap + 幅/2 < 480）
-  function gapFor(step) { return Math.min(96 + step * 2.6, 214) + Math.random() * Math.min(18 + step * 1.2, 52); }
-  function widthFor(step) { return Math.max(112 - step * 2.1, 46); }
-  function perfectWinFor(step) { return Math.max(26 - step * 0.32, 12); }
+  // 難度は4つの軸に配分する。1つ（幅）だけを削ると、スマホの縦画面では
+  // すぐ限界が来て「変化が見えないか、細くなりすぎるか」の二択になる（2026-08-25 実プレイの指摘）。
+  //   ①間合いの基準 ②間合いのブレ（主役）③札の幅（下限64で止める）④台座の左右移動
+  function gapFor(step) {
+    var base = Math.min(96 + step * 2.0, 176);
+    var jitter = Math.min(22 + step * 2.0, 70);   // 同じ溜めが通用しないようにする
+    return base + Math.random() * jitter;
+  }
+  function widthFor(step) { return Math.max(116 - step * 1.35, 64); }
+  function perfectWinFor(step) { return Math.max(26 - step * 0.28, 13); }
+  // 12段までは静止。以降ゆっくり左右に揺れ、終盤の主役になる
+  function driftFor(step) { return step < 12 ? 0 : Math.min((step - 12) * 0.85, 26); }
 
   function pushPlat(s) {
     var last = s.plats[s.plats.length - 1];
-    var gap = gapFor(s.step + s.plats.length);
-    var w = widthFor(s.step + s.plats.length);
-    s.plats.push({ x: last.x + last.w / 2 + gap + w / 2, w: w });
+    var n = s.step + s.plats.length;
+    var gap = gapFor(n);
+    var w = widthFor(n);
+    s.plats.push({
+      x: last.x + last.w / 2 + gap + w / 2, w: w,
+      amp: driftFor(n), ph: Math.random() * Math.PI * 2
+    });
   }
+  // 台座の実際の位置（左右に揺れるものがある）
+  function platX(p) { return p.amp ? p.x + Math.sin(performance.now() / 900 + p.ph) * p.amp : p.x; }
 
   function reset() {
     var keepBestMoon = state ? state.moonPhase : 0;
     state = newState();
     state.moonPhase = keepBestMoon;
     state.charIdx = 0;
-    state.plats = [{ x: STAND_X, w: 130 }];
+    state.plats = [{ x: STAND_X, w: 130, amp: 0, ph: 0 }];
     for (var i = 0; i < 4; i++) pushPlat(state);
     lockUntil = performance.now() + 700;   // 開始・リトライ直後は入力を止める（既存2作の作法）
+    ripples.length = 0; swap.t = 0;
   }
 
   function currentChar() { return IDS[state.charIdx % IDS.length]; }
@@ -188,14 +242,16 @@
 
     var t = Math.min(held, 1.0);
     var heavy = isHeavy(currentChar());
-    // 重い御霊は同じ溜めでも伸びにくく、弧が低い
-    var dist = (72 + t * (heavy ? 268 : 296)) * (heavy ? 0.96 : 1.0);
+    // 重い御霊は「同じ溜めでは伸びない」（序盤〜中盤で2割ほど短い）が、最大射程は同じにする。
+    // 射程そのものを詰めると、終盤の間合いに届かなくなって詰むため（2026-08-25 修正）。
+    var curve = heavy ? Math.pow(t, 1.45) : t;
+    var dist = 72 + curve * 300;
     var cur = s.plats[0], next = s.plats[1];
-    var landX = cur.x + dist;
+    var landX = platX(cur) + dist;
     var dur = 0.34 + Math.min(dist / 900, 0.34);
-    var peak = (heavy ? 88 : 130) + dist * (heavy ? 0.18 : 0.28);
+    var peak = (heavy ? 76 : 132) + dist * (heavy ? 0.16 : 0.30);
 
-    s.jump = { t: 0, dur: dur, x0: cur.x, x1: landX, peak: peak, dist: dist, next: next };
+    s.jump = { t: 0, dur: dur, x0: platX(cur), x1: landX, peak: peak, dist: dist, next: next };
     se("zan", 0.8);
     if (DBG.stat) statLog.push({ step: s.step, held: +held.toFixed(3), dist: Math.round(dist), target: Math.round(next.x - cur.x) });
   }
@@ -203,12 +259,12 @@
   function land() {
     var s = state, j = s.jump; s.jump = null;
     var next = j.next;
-    var d = Math.abs(j.x1 - next.x);
+    var d = Math.abs(j.x1 - platX(next));
     var half = next.w / 2;
 
     if (d > half) {                       // 台座を外した
-      s.overReason = (j.x1 < next.x) ? "届かなかった" : "跳びすぎた";
-      se(j.x1 < next.x ? "whiff" : "bomb", 1.0);
+      s.overReason = (j.x1 < platX(next)) ? "届かなかった" : "跳びすぎた";
+      se(j.x1 < platX(next) ? "whiff" : "bomb", 1.0);
       gameOver();
       return;
     }
@@ -216,6 +272,7 @@
     s.plats.shift(); pushPlat(s);
 
     var win = perfectWinFor(s.step);
+    ripple(j.x1, GROUND_Y + 12, d <= win);
     if (d <= win) {                       // 会心
       s.combo++;
       s.maxCombo = Math.max(s.maxCombo, s.combo);
@@ -229,13 +286,60 @@
     // 節目（10段ごと）
     if (s.step % 10 === 0) { se("kiwami", 0.9); flash(s.step + "段", C.kindei); }
     // 5段ごとに御霊が交代する（34体を巡回＝素材がそのまま尺になる）
-    if (s.step % 5 === 0) { s.charIdx++; }
+    if (s.step % 5 === 0) { s.charIdx++; showSwap(currentChar()); }
     // 満月（50段）
     if (s.step === 50) { flash("満月成就", C.moon); se("kiwami", 1.0); }
     s.moonPhase = Math.max(s.moonPhase, Math.min(s.step / 50, 1));
   }
 
   function flash(text, color) { state.flash = 1.0; state.flashText = text; state.flashColor = color; }
+
+  // 着地の波紋（会心は金・通常は淡く）
+  var ripples = [];
+  function ripple(x, y, strong) { ripples.push({ x: x, y: y, t: 0, strong: !!strong }); }
+  function drawRipples(dt, camX) {
+    for (var i = ripples.length - 1; i >= 0; i--) {
+      var r = ripples[i]; r.t += dt * (r.strong ? 2.2 : 3.2);
+      if (r.t >= 1) { ripples.splice(i, 1); continue; }
+      ctx.save();
+      ctx.globalAlpha = (1 - r.t) * (r.strong ? 0.85 : 0.4);
+      ctx.strokeStyle = r.strong ? C.moon : C.inkDim;
+      ctx.lineWidth = r.strong ? 2.4 : 1.4;
+      ctx.beginPath();
+      ctx.ellipse(r.x - camX, r.y, 18 + r.t * (r.strong ? 78 : 46), 5 + r.t * (r.strong ? 22 : 13), 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // 御霊の交代を見せる（顔アイコン＋名前＋重い/軽い）
+  var swap = { t: 0, id: null };
+  function showSwap(id) { swap.t = 1.0; swap.id = id; }
+  function drawSwap(dt) {
+    if (swap.t <= 0) return;
+    swap.t = Math.max(0, swap.t - dt * 0.7);
+    var a = Math.min(swap.t * 2.4, 1);
+    var ic = icons[swap.id];
+    ctx.save();
+    ctx.globalAlpha = a;
+    var cx = W / 2, cy = 200;
+    if (ic && ic.complete && ic.naturalWidth) {
+      var r = 44;
+      ctx.save();
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.closePath(); ctx.clip();
+      ctx.drawImage(ic, cx - r, cy - r, r * 2, r * 2);
+      ctx.restore();
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(240,206,126,.8)"; ctx.lineWidth = 2; ctx.stroke();
+    }
+    ctx.textAlign = "center";
+    ctx.fillStyle = C.ink; ctx.font = "700 21px 'Shippori Mincho B1',serif";
+    ctx.fillText(NAMES[swap.id] || swap.id, cx, cy + 74);
+    ctx.fillStyle = isHeavy(swap.id) ? C.anshi : C.kindei;
+    ctx.font = "700 15px 'Shippori Mincho B1',serif";
+    ctx.fillText(isHeavy(swap.id) ? "重い　溜めが要る" : "軽い　よく伸びる", cx, cy + 98);
+    ctx.restore();
+  }
 
   function gameOver() {
     var s = state;
@@ -280,6 +384,38 @@
     g.addColorStop(0, "#0e0e19"); g.addColorStop(0.55, C.night); g.addColorStop(1, C.night2);
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
 
+    // 遠景（ゆっくり流れる）。帯の上下は地色でぼかして、切れ目を出さない
+    if (ready(bgFar)) {
+      var fh = 340, fy = GROUND_Y - 292;
+      ctx.save(); ctx.globalAlpha = 0.92;
+      tileMirrored(bgFar, s.camX * 0.18, fy, fh);
+      ctx.restore();
+      var fadeTop = ctx.createLinearGradient(0, fy, 0, fy + 110);
+      fadeTop.addColorStop(0, "rgba(19,19,32,1)"); fadeTop.addColorStop(1, "rgba(19,19,32,0)");
+      ctx.fillStyle = fadeTop; ctx.fillRect(0, fy, W, 110);
+      var fadeBot = ctx.createLinearGradient(0, fy + fh - 90, 0, fy + fh);
+      fadeBot.addColorStop(0, "rgba(19,19,32,0)"); fadeBot.addColorStop(1, "rgba(22,21,38,.96)");
+      ctx.fillStyle = fadeBot; ctx.fillRect(0, fy + fh - 90, W, 90);
+    }
+
+    // 雲海（札の下の空白を埋め、浮いている高さを感じさせる）
+    ctx.save();
+    var sea = ctx.createLinearGradient(0, GROUND_Y + 40, 0, H);
+    sea.addColorStop(0, "rgba(30,28,52,0)");
+    sea.addColorStop(0.45, "rgba(32,30,56,.55)");
+    sea.addColorStop(1, "rgba(18,17,34,.92)");
+    ctx.fillStyle = sea; ctx.fillRect(0, GROUND_Y + 40, W, H - GROUND_Y - 40);
+    ctx.globalAlpha = 0.5;
+    for (var ci = 0; ci < 5; ci++) {
+      var cw = 200 + ci * 46, cyy = GROUND_Y + 120 + ci * 52;
+      var cxx = ((ci * 173 - s.camX * (0.12 + ci * 0.03)) % (W + cw * 2)) - cw;
+      var cg = ctx.createRadialGradient(cxx, cyy, 6, cxx, cyy, cw);
+      cg.addColorStop(0, "rgba(142,107,158,.16)"); cg.addColorStop(1, "rgba(142,107,158,0)");
+      ctx.fillStyle = cg;
+      ctx.beginPath(); ctx.ellipse(cxx, cyy, cw, 34, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+
     // 星
     ctx.fillStyle = "rgba(232,228,216,.5)";
     for (var i = 0; i < 42; i++) {
@@ -306,30 +442,55 @@
     ctx.beginPath(); ctx.arc(cut, my, mr, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
     ctx.restore();
+
+    // 近景（手前を速く流す）。上端はぼかして、帯に見えないようにする
+    if (ready(bgNear)) {
+      var nh = 250, ny = H - nh;
+      ctx.save(); ctx.globalAlpha = 0.8;
+      tileMirrored(bgNear, s.camX * 0.42, ny, nh);
+      ctx.restore();
+      var nfade = ctx.createLinearGradient(0, ny, 0, ny + 90);
+      nfade.addColorStop(0, "rgba(19,19,32,.9)"); nfade.addColorStop(1, "rgba(19,19,32,0)");
+      ctx.fillStyle = nfade; ctx.fillRect(0, ny, W, 90);
+    }
   }
 
   function drawPlat(p, camX) {
-    var x = p.x - camX, y = GROUND_Y;
-    var w = p.w, h = 16;
+    var x = platX(p) - camX, y = GROUND_Y;
+    var w = p.w, h = 20;
     ctx.save();
-    // 式札に見立てた台座（角を落とした短冊）
+    // 宙に浮く式札。下に淡い金の残光を落として「浮いている」ことを見せる
+    var glow = ctx.createRadialGradient(x, y + h, 2, x, y + h, w * 0.9);
+    glow.addColorStop(0, "rgba(240,206,126,.16)"); glow.addColorStop(1, "rgba(240,206,126,0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.ellipse(x, y + h + 6, w * 0.9, 16, 0, 0, Math.PI * 2); ctx.fill();
+
+    // 札の面（上面がわずかに広い短冊）
     ctx.beginPath();
-    ctx.moveTo(x - w / 2 + 6, y); ctx.lineTo(x + w / 2 - 6, y);
-    ctx.lineTo(x + w / 2, y + h); ctx.lineTo(x - w / 2, y + h); ctx.closePath();
+    ctx.moveTo(x - w / 2, y); ctx.lineTo(x + w / 2, y);
+    ctx.lineTo(x + w / 2 - 5, y + h); ctx.lineTo(x - w / 2 + 5, y + h); ctx.closePath();
     var g = ctx.createLinearGradient(0, y, 0, y + h);
-    g.addColorStop(0, "#232338"); g.addColorStop(1, "#15151f");
+    g.addColorStop(0, "#2A2A44"); g.addColorStop(1, "#14141F");
     ctx.fillStyle = g; ctx.fill();
-    ctx.strokeStyle = "rgba(240,206,126,.55)"; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.strokeStyle = "rgba(240,206,126,.62)"; ctx.lineWidth = 1.3; ctx.stroke();
+
+    // 呪の線（札の意匠。幅に応じて本数を変える）
+    ctx.strokeStyle = "rgba(240,206,126,.22)"; ctx.lineWidth = 1;
+    var n = Math.max(2, Math.round(w / 26));
+    for (var i = 1; i < n; i++) {
+      var lx = x - w / 2 + (w / n) * i;
+      ctx.beginPath(); ctx.moveTo(lx, y + 4); ctx.lineTo(lx - 2, y + h - 4); ctx.stroke();
+    }
     // 中央の印（会心の目安）
-    ctx.beginPath(); ctx.moveTo(x, y + 3); ctx.lineTo(x, y + h - 3);
-    ctx.strokeStyle = "rgba(240,206,126,.35)"; ctx.lineWidth = 1; ctx.stroke();
+    ctx.strokeStyle = "rgba(240,206,126,.85)"; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(x, y - 3); ctx.lineTo(x, y + h + 1); ctx.stroke();
     ctx.restore();
   }
 
   function drawChar(s, x, y, scale) {
     var id = currentChar();
     var im = imgs[id];
-    var hgt = 78 * (scale || 1);
+    var hgt = 108 * (scale || 1);
     if (im && im.complete && im.naturalWidth) {
       var w = hgt * (im.naturalWidth / im.naturalHeight);
       // 影
@@ -369,6 +530,14 @@
       ctx.fillStyle = C.moon; ctx.font = "700 22px 'Shippori Mincho B1',serif";
       ctx.fillText("会心 " + s.combo + "連", W - 22, 56);
     }
+    // いま跳ぶ御霊の名前と癖（数値だけの差は体感できないため、画面に出す）
+    var id = currentChar(), hv = isHeavy(id);
+    ctx.textAlign = "right";
+    ctx.fillStyle = C.inkDim; ctx.font = "600 14px 'Shippori Mincho B1',serif";
+    ctx.fillText(NAMES[id] || id, W - 22, s.combo >= 2 ? 80 : 56);
+    ctx.fillStyle = hv ? C.anshi : C.kindei;
+    ctx.font = "700 14px 'Shippori Mincho B1',serif";
+    ctx.fillText(hv ? "重" : "軽", W - 22, s.combo >= 2 ? 102 : 78);
     ctx.restore();
   }
 
@@ -380,7 +549,7 @@
     ctx.textAlign = "center";
     ctx.fillStyle = s.flashColor;
     ctx.font = "800 34px 'Shippori Mincho B1',serif";
-    ctx.fillText(s.flashText, W / 2, 300 - (1 - s.flash) * 26);
+    ctx.fillText(s.flashText, W / 2, 356 - (1 - s.flash) * 26);
     ctx.restore();
   }
 
@@ -428,10 +597,11 @@
     if (s.phase !== "play" || s.jump) return;
     if (!s.charging) { s.charging = true; s.chargeStart = performance.now(); return; }
     var cur = s.plats[0], next = s.plats[1];
-    var want = next.x - cur.x;
+    var want = platX(next) - platX(cur);
     if (DBG.automiss) want *= 1.6;                       // わざと跳びすぎる
     var heavy = isHeavy(currentChar());
-    var t = (want / (heavy ? 0.96 : 1.0) - 72) / (heavy ? 268 : 296);
+    var want01 = Math.max(0, Math.min((want - 72) / 300, 1));
+    var t = heavy ? Math.pow(want01, 1 / 1.45) : want01;
     var held = Math.max(0.16, Math.min(t, 1.0));
     if ((performance.now() - s.chargeStart) / 1000 >= held) release();
   }
@@ -444,14 +614,16 @@
 
     if (DBG.autoperfect || DBG.automiss) autoTick(s);
 
-    // カメラは足元の台座が STAND_X に来るように追う
-    var targetCam = s.plats[0].x - STAND_X;
-    s.camX += (targetCam - s.camX) * Math.min(dt * 13, 1);
+    // カメラは足元の台座が STAND_X に来るように追う。
+    // 跳んでいる間は着地先へ寄せておく（着地した瞬間に次の札が見えていないと狙えないため）
+    var anchor = s.jump ? platX(s.jump.next) : platX(s.plats[0]);
+    var targetCam = anchor - STAND_X;
+    s.camX += (targetCam - s.camX) * Math.min(dt * (s.jump ? 6 : 15), 1);
 
     drawBg(s);
     for (var i = 0; i < s.plats.length; i++) drawPlat(s.plats[i], s.camX);
 
-    var px = s.plats[0].x - s.camX, py = GROUND_Y;
+    var px = platX(s.plats[0]) - s.camX, py = GROUND_Y;
     if (s.jump) {
       s.jump.t += dt;
       var k = Math.min(s.jump.t / s.jump.dur, 1);
@@ -466,7 +638,9 @@
       drawChargeRing(s, px + shake);
     }
 
+    drawRipples(dt, s.camX);
     if (s.phase === "play") drawHud(s);
+    drawSwap(dt);
     drawFlash(s, dt);
     if (s.phase === "title") drawTitle();
     if (s.phase === "result") drawResult(s);
