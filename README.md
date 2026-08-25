@@ -18,7 +18,7 @@ node scripts/build-dist.js       # src/ → index.html（単一HTML）
 NODE_PATH=../shikifuda-kasane/node_modules node scripts/playtest.js   # 通し検証
 ```
 
-デバッグ用ハッシュ: `#autoperfect`（自動で会心を出し続ける）／`#automiss`（わざと外す）／`#stat`（押下時間と着地のずれを記録）／`nofloat`（撮影用）。
+デバッグ用ハッシュ: `#autoperfect`（自動で会心を出し続ける）／`#automiss`（わざと外す）／`#autoskip`（台座の一つ飛ばしを狙う）／`#wx0`〜`#wx2`（天候を固定: 月夜・追い風・雨）／`#stat`（押下時間と着地のずれを記録）／`nofloat`（撮影用）。
 
 ## クレジット
 

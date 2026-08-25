@@ -78,7 +78,9 @@
     autoperfect: hash.indexOf("autoperfect") >= 0,
     automiss: hash.indexOf("automiss") >= 0,
     stat: hash.indexOf("stat") >= 0,
-    nofloat: hash.indexOf("nofloat") >= 0
+    nofloat: hash.indexOf("nofloat") >= 0,
+    autoskip: hash.indexOf("autoskip") >= 0,  // わざと台座を飛ばして狙う（飛ばしの確認用）
+    wx: (hash.match(/wx(\d)/) || [])[1]        // 天候を固定する（0=月夜 1=追い風 2=雨）
   };
   var statLog = [];
 
@@ -261,6 +263,7 @@
     ripples.length = 0; swap.t = 0;
     state.charX = STAND_X; state.charOff = 0; state.camX = 0;
     state.order = shuffled(IDS);   // 毎回ちがう御霊から始まり、ちがう順で出る
+    if (DBG.wx !== undefined) state.weather = parseInt(DBG.wx, 10) || 0;
   }
 
   function shuffled(arr) {
@@ -303,24 +306,29 @@
 
   function land() {
     var s = state, j = s.jump; s.jump = null;
-    var next = j.next;
-    var d = Math.abs(j.x1 - platX(next));
-    var half = next.w / 2;
-
-    if (d > half) {                       // 台座を外した
-      var short = j.x1 < platX(next);
+    // どの台座に乗ったかを探す。目の前の台座を飛び越して、その先に乗ることもある
+    var hit = -1, d = 0;
+    for (var k = 1; k < s.plats.length; k++) {
+      var pk = s.plats[k], dk = Math.abs(j.x1 - platX(pk));
+      if (dk <= pk.w / 2) { hit = k; d = dk; break; }
+    }
+    if (hit < 0) {                        // どの台座にも乗れなかった
+      var short = j.x1 < platX(s.plats[1]);
       s.overReason = short ? "届かなかった" : "跳びすぎた";
       se(short ? "whiff" : "bomb", 1.0);
       startFall(j.x1, short);             // 即終了せず、画面の下まで落として見せる
       return;
     }
-    s.step++;
+    var next = s.plats[hit];
+    var skipped = hit - 1;                // 飛ばした台座の数
+    var prevStep = s.step;
+    s.step += hit;
     // 着いた場所にそのまま立つ（次の間合いが変わる＝考慮要素が増える）。
     // 位置は台座の中心からのずれで持つ。そうしないと、揺れる台座だけが足元を滑ってしまう。
     s.charOff = j.x1 - platX(next);
-    s.plats.shift(); pushPlat(s);
+    for (var sh = 0; sh < hit; sh++) { s.plats.shift(); pushPlat(s); }
     s.charX = platX(s.plats[0]) + s.charOff;
-    if (s.step % WEATHER_EVERY === 0) {
+    if (DBG.wx === undefined && Math.floor(s.step / WEATHER_EVERY) > Math.floor(prevStep / WEATHER_EVERY)) {
       // 同じ天候は続かない。月夜（基準）を重めに引いて、追い風と雨が「出来事」として立つようにする
       var bag = [];
       for (var wi = 0; wi < WEATHER.length; wi++) {
@@ -331,6 +339,12 @@
       s.wxT = 1.0; se("count", 0.7);
     }
 
+    if (skipped > 0) {                    // 台座を飛び越した
+      flash(skipped === 1 ? "一つ飛ばし" : skipped + "つ飛ばし", C.shokko);
+      se("bomb", 0.5);
+      s.combo += skipped;                 // 思い切りの分だけ連が伸びる
+      s.maxCombo = Math.max(s.maxCombo, s.combo);
+    }
     var win = perfectWinFor(s.step);
     ripple(j.x1, GROUND_Y + 12, d <= win);
     if (d <= win) {                       // 会心
@@ -344,11 +358,11 @@
       se("count", 0.55);
     }
     // 節目（10段ごと）
-    if (s.step % 10 === 0) { se("fukaku", 0.85); flash(s.step + "段", C.kindei); }
+    if (Math.floor(s.step / 10) > Math.floor(prevStep / 10)) { se("fukaku", 0.85); flash(s.step + "段", C.kindei); }
     // 5段ごとに御霊が交代する（34体を巡回＝素材がそのまま尺になる）
-    if (s.step % SWAP_EVERY === 0) { s.charIdx++; showSwap(currentChar()); se("zan", 0.55); }
+    if (Math.floor(s.step / SWAP_EVERY) > Math.floor(prevStep / SWAP_EVERY)) { s.charIdx++; showSwap(currentChar()); se("zan", 0.55); }
     // 満月（50段）
-    if (s.step === 50) { flash("満月成就", C.moon); se("kiwami", 1.0); }
+    if (prevStep < 50 && s.step >= 50) { flash("満月成就", C.moon); se("kiwami", 1.0); }
     s.moonPhase = Math.max(s.moonPhase, Math.min(s.step / 50, 1));
   }
 
@@ -587,11 +601,11 @@
     var t = performance.now() / 1000;
     ctx.save();
     if (w.id === "ame") {
-      ctx.strokeStyle = "rgba(95,180,217,.28)"; ctx.lineWidth = 1.1;
-      for (var i = 0; i < 46; i++) {
+      ctx.strokeStyle = "rgba(150,215,245,.62)"; ctx.lineWidth = 1.6;
+      for (var i = 0; i < 72; i++) {
         var x = (i * 113 + (t * 620) % 97) % (W + 60) - 30;
         var y = (i * 71 + t * 900) % (H + 80) - 40;
-        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 7, y + 22); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 8, y + 26); ctx.stroke();
       }
     } else {
       ctx.strokeStyle = "rgba(240,206,126,.20)"; ctx.lineWidth = 1.2;
@@ -836,6 +850,7 @@
     var cur = s.plats[0], next = s.plats[1];
     var want = platX(next) - s.charX;
     if (DBG.automiss) want *= 1.6;                       // わざと跳びすぎる
+    if (DBG.autoskip && s.plats[2]) want = platX(s.plats[2]) - s.charX;   // 一つ飛ばしを狙う
     var t = Math.max(0, Math.min((want / WEATHER[s.weather].mul - 72) / 300, 1));
     var held = Math.max(0.16, Math.min(t, 1.0));
     if ((performance.now() - s.chargeStart) / 1000 >= held) release();
@@ -847,7 +862,7 @@
     var dt = Math.min((now - last) / 1000, 0.05); last = now;
     var s = state;
 
-    if (DBG.autoperfect || DBG.automiss) autoTick(s);
+    if (DBG.autoperfect || DBG.automiss || DBG.autoskip) autoTick(s);
 
     // カメラは「キャラが STAND_X に来る位置」を目指すが、**跳んでいる間は動かさない**。
     // 弧とカメラの移動が混ざると、右へ跳んでいるのに一度左へ流れて見える（2026-08-25 指摘）。
@@ -862,7 +877,7 @@
       var onScreen = s.fall.x - s.camX;
       if (onScreen > W - 70) s.camX += (onScreen - (W - 70)) * Math.min(dt * 6, 1);
       else if (onScreen < 40) s.camX += (onScreen - 40) * Math.min(dt * 6, 1);
-    } else if (!s.jump) {
+    } else if (!s.jump && s.phase !== "result") {
       var targetCam = s.charX - STAND_X;
       s.camX += (targetCam - s.camX) * Math.min(dt * 14, 1);
     }

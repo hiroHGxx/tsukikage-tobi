@@ -60,7 +60,7 @@ async function run(base, hash, until, timeout, shot) {
   const routes = [
     { name: "自動プレイで満月（50段）まで", hash: "#autoperfect",
       until: "window.__tsukikage.state.step >= 50", timeout: 180000, shot: "/tmp/tsukikage-moon.png" },
-    { name: "中盤の見た目（17段・天候あり）", hash: "#autoperfect",
+    { name: "中盤の見た目（17段・雨）", hash: "#autoperfect,wx2",
       until: "window.__tsukikage.state.step >= 17", timeout: 90000, shot: "/tmp/tsukikage-mid.png" },
     { name: "御霊の交代（立ち絵が出る）", hash: "#autoperfect",
       until: "window.__tsukikage.swap.t > 0.55 && window.__tsukikage.state.step >= 10",
@@ -68,6 +68,9 @@ async function run(base, hash, until, timeout, shot) {
     { name: "交代カットイン・30段台", hash: "#autoperfect",
       until: "window.__tsukikage.swap.t > 0.55 && window.__tsukikage.state.step >= 30",
       timeout: 90000, shot: "/tmp/tsukikage-swap30.png" },
+    { name: "台座の一つ飛ばし（追い風で成立するか）", hash: "#autoskip,wx1",
+      until: "window.__tsukikage.state.step >= 4 || window.__tsukikage.state.phase === 'result'",
+      timeout: 40000, shot: "/tmp/tsukikage-skip.png" },
     { name: "外したときの落下（画面下へ落ちる）", hash: "#automiss",
       until: "window.__tsukikage.state.phase === 'fall' && window.__tsukikage.state.fall && window.__tsukikage.state.fall.y > 520",
       timeout: 30000, shot: "/tmp/tsukikage-fall.png" },
