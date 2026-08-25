@@ -325,7 +325,7 @@
     // 節目（10段ごと）
     if (s.step % 10 === 0) { se("kiwami", 0.9); flash(s.step + "段", C.kindei); }
     // 5段ごとに御霊が交代する（34体を巡回＝素材がそのまま尺になる）
-    if (s.step % 5 === 0) { s.charIdx++; showSwap(currentChar()); }
+    if (s.step % 5 === 0) { s.charIdx++; showSwap(currentChar()); se("zan", 0.55); }
     // 満月（50段）
     if (s.step === 50) { flash("満月成就", C.moon); se("kiwami", 1.0); }
     s.moonPhase = Math.max(s.moonPhase, Math.min(s.step / 50, 1));
@@ -379,55 +379,71 @@
   // 御霊の交代を見せる（顔アイコン＋名前＋重い/軽い）
   var swap = { t: 0, id: null };
   function showSwap(id) { swap.t = 1.0; swap.id = id; }
+  // 御霊の交代カットイン。御霊おとしの咲耶カットインと同じ流儀で、
+  // 帯の上をシャキンと左から入り、真ん中で一瞬止まり、右へ抜ける。
+  // 帯と絵は石垣より「後ろ」に描く（手前だと次の石垣と会心の帯が隠れて遊びの邪魔になる）。
+  var SWAP_SEC = 1.5;
   function drawSwap(dt, layer) {
     if (swap.t <= 0) return;
-    if (layer === 1) swap.t = Math.max(0, swap.t - dt * 0.62);
+    if (layer === 1) swap.t = Math.max(0, swap.t - dt / SWAP_SEC);
     var id = swap.id;
-    var art = canons[id], ic = icons[id];
-    var p = 1 - swap.t;                       // 0→1
-    var appear = Math.min(p / 0.16, 1);       // 出るのは速く
-    var fade = swap.t < 0.24 ? swap.t / 0.24 : 1;
-    var ease = 1 - Math.pow(1 - appear, 3);
+    var p = 1 - swap.t;                      // 0→1
+    var art = canons[id] || icons[id];
 
-    ctx.save();
-    ctx.globalAlpha = fade;
-    if (layer === 0) {   // 背後の層（石垣より後ろに描く）
+    // 帯: 開く → 保つ → 閉じる
+    var band = p < 0.10 ? p / 0.10 : (p > 0.86 ? Math.max(0, (1 - p) / 0.14) : 1);
+    band = Math.min(1, band);
+    var bandH = 300 * (0.35 + 0.65 * band);
+    var by = GROUND_Y - 40 - bandH;
 
-    // 立ち絵は右から差し込む。無い御霊（栞・あるじどの・結）は顔アイコンで代える
-    if (art && art.complete && art.naturalWidth) {
-      var ah = 300, aw = ah * (art.naturalWidth / art.naturalHeight);
-      var ax = W - aw * 0.80 + (1 - ease) * 90;
-      var ay = GROUND_Y - ah + 26;
-      // 背後に金の帯（立ち絵を宵闇から起こす）
-      var band = ctx.createLinearGradient(ax - 40, 0, ax + aw, 0);
-      band.addColorStop(0, "rgba(240,206,126,0)");
-      band.addColorStop(0.45, "rgba(240,206,126,.13)");
-      band.addColorStop(1, "rgba(240,206,126,0)");
-      ctx.fillStyle = band; ctx.fillRect(0, ay - 10, W, ah + 20);
-      ctx.globalAlpha = fade * (0.35 + 0.65 * ease);
-      ctx.drawImage(art, ax, ay, aw, ah);
-      ctx.globalAlpha = fade;
-    } else if (ic && ic.complete && ic.naturalWidth) {
-      var r = 46, cx0 = W - 96 + (1 - ease) * 60, cy0 = GROUND_Y - 190;
+    // 絵の位置: 左から入る → 中央で止まる → 右へ抜ける
+    var ax01;
+    if (p < 0.13) { var e = p / 0.13; ax01 = -0.5 + 0.5 * (1 - Math.pow(1 - e, 3)); }
+    else if (p < 0.56) { ax01 = 0 + (p - 0.13) * 0.06; }
+    else if (p < 0.82) { var e2 = (p - 0.56) / 0.26; ax01 = 0 + Math.pow(e2, 2.2) * 1.35; }
+    else ax01 = 1.35;
+
+    if (layer === 0) {
       ctx.save();
-      ctx.beginPath(); ctx.arc(cx0, cy0, r, 0, Math.PI * 2); ctx.clip();
-      ctx.drawImage(ic, cx0 - r, cy0 - r, r * 2, r * 2);
+      // 帯（宵闇の帯に金の細線。絵を宵闇から起こす）
+      ctx.globalAlpha = 0.95 * band;
+      var bg = ctx.createLinearGradient(0, by, 0, by + bandH);
+      bg.addColorStop(0, "rgba(10,10,20,.15)");
+      bg.addColorStop(0.5, "rgba(10,10,20,.72)");
+      bg.addColorStop(1, "rgba(10,10,20,.15)");
+      ctx.fillStyle = bg; ctx.fillRect(0, by, W, bandH);
+      ctx.strokeStyle = "rgba(240,206,126,.55)"; ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.moveTo(0, by + 1); ctx.lineTo(W, by + 1);
+      ctx.moveTo(0, by + bandH - 1); ctx.lineTo(W, by + bandH - 1); ctx.stroke();
+      // 帯を横切る光
+      var sweep = ctx.createLinearGradient(W * (ax01 + 0.1) - 120, 0, W * (ax01 + 0.1) + 120, 0);
+      sweep.addColorStop(0, "rgba(240,206,126,0)");
+      sweep.addColorStop(0.5, "rgba(240,206,126,.10)");
+      sweep.addColorStop(1, "rgba(240,206,126,0)");
+      ctx.fillStyle = sweep; ctx.fillRect(0, by, W, bandH);
+
+      // 立ち絵（無い御霊は顔アイコンで代える）
+      if (art && art.complete && art.naturalWidth) {
+        var ah = bandH * 0.94, aw = ah * (art.naturalWidth / art.naturalHeight);
+        var cxA = W * 0.5 + ax01 * (W * 0.78 + aw * 0.6);
+        ctx.globalAlpha = band;
+        ctx.drawImage(art, cxA - aw / 2, by + bandH - ah - 6, aw, ah);
+      }
       ctx.restore();
-      ctx.beginPath(); ctx.arc(cx0, cy0, r, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(240,206,126,.75)"; ctx.lineWidth = 2; ctx.stroke();
-    }
-      ctx.restore(); return;
+      return;
     }
 
-    // 名前は左側に縦の金線を添えて置く（立ち絵とぶつからない位置）
-    var tx = 30 - (1 - ease) * 16;
+    // 名前と肩書き（手前の層。帯の左に置いて、絵が抜けても残る）
+    ctx.save();
+    ctx.globalAlpha = band;
+    var tx = 26 + (p < 0.13 ? (1 - p / 0.13) * -30 : 0);
     ctx.textAlign = "left";
-    ctx.strokeStyle = "rgba(240,206,126,.7)"; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(tx - 10, GROUND_Y - 168); ctx.lineTo(tx - 10, GROUND_Y - 104); ctx.stroke();
+    ctx.strokeStyle = "rgba(240,206,126,.75)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(tx - 10, by + 26); ctx.lineTo(tx - 10, by + 90); ctx.stroke();
     ctx.fillStyle = C.ink; ctx.font = "800 30px 'Shippori Mincho B1',serif";
-    ctx.fillText(NAMES[id] || id, tx, GROUND_Y - 132);
+    ctx.fillText(NAMES[id] || id, tx, by + 58);
     ctx.fillStyle = C.kindei; ctx.font = "600 15px 'Shippori Mincho B1',serif";
-    ctx.fillText(TAGS[id] || "", tx, GROUND_Y - 110);
+    ctx.fillText(TAGS[id] || "", tx, by + 82);
     ctx.restore();
   }
 
@@ -750,7 +766,7 @@
     ctx.textAlign = "center";
     ctx.fillStyle = s.flashColor;
     ctx.font = "800 34px 'Shippori Mincho B1',serif";
-    ctx.fillText(s.flashText, W / 2, 232 - (1 - s.flash) * 22);
+    ctx.fillText(s.flashText, W / 2, GROUND_Y + 104 - (1 - s.flash) * 20);
     ctx.restore();
   }
 

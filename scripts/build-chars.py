@@ -65,6 +65,10 @@ def main():
         cid = a["char"]
         if cid not in out: continue
         src = fetch(a["url"], os.path.join(CACHE, f"{cid}_canon.png"))
+        if src is None:
+            # 台帳に載っていても素材蔵が404のことがある。公式サイトのmediaパスへ退避する
+            src = fetch(f"https://vibe.co.jp/luna-occulta/media/img/canon/{cid}_canon.webp",
+                        os.path.join(CACHE, f"{cid}_canon.webp"))
         if src is None: continue
         im = Image.open(src).convert("RGBA")
         arr = np.array(im).astype(int)
@@ -83,6 +87,18 @@ def main():
         cut = Image.fromarray(px[ys.min():ys.max()+1, xs.min():xs.max()+1], "RGBA")
         cut.thumbnail((360, 380), Image.LANCZOS)
         b = io.BytesIO(); cut.save(b, "WEBP", quality=76, method=6)
+        canon[cid] = "data:image/webp;base64," + base64.b64encode(b.getvalue()).decode()
+
+    # 正典立ち絵が配布されていないキャラ（栞など）は、正典シート（三面図）の
+    # 正面立ち絵をちび絵と同じ手順で切り出して代える。
+    for cid in out.keys():
+        if cid in canon: continue
+        src = fetch(f"https://vibe.co.jp/luna-occulta/media/img/canon/{cid}_sheet.webp",
+                    os.path.join(CACHE, f"{cid}_sheet.webp"))
+        if src is None: continue
+        im = extract_front(src, box=380)
+        if im is None: continue
+        b = io.BytesIO(); im.save(b, "WEBP", quality=78, method=6)
         canon[cid] = "data:image/webp;base64," + base64.b64encode(b.getvalue()).decode()
 
     # 顔アイコン（透過・そのまま使える）も小さくして持つ。御霊の交代表示に使う。
