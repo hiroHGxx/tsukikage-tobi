@@ -17,7 +17,8 @@
   };
 
   // ---- 御霊の並び（chars.js のキー順＝素材蔵の台帳順）----
-  var IDS = Object.keys(CHIBI);
+  // 「あるじどの」は御霊ではなく主人公（御霊を式札に宿す側）なので、跳ぶ御霊の巡回には入れない
+  var IDS = Object.keys(CHIBI).filter(function (id) { return id !== "arujidono"; });
   // 風魔勢は鎧・鬼系＝「重い」。見た目がそのまま説明になるので注記は出さない。
   var HEAVY = { atoza: 1, aun: 1, dan: 1, janome: 1, karma: 1, kohaku: 1, orochi: 1, rotton: 1 };
   var NAMES = {
@@ -209,7 +210,8 @@
       flash: 0, flashText: "", flashColor: C.moon,
       moonPhase: 0,         // 0..1（最高到達段に応じて満ちる）
       weather: 0, wxT: 0,   // 天候の番号と、切り替え表示の残り
-      charX: 0,             // キャラの実際の位置（着地した場所にそのまま立つ）
+      charX: 0, charOff: 0,  // キャラの位置。charOff は「台座の中心からのずれ」で、
+                             // 揺れる台座に乗って一緒に動くために保つ
       overReason: ""
     };
   }
@@ -253,7 +255,7 @@
     for (var i = 0; i < 4; i++) pushPlat(state);
     lockUntil = performance.now() + 700;   // 開始・リトライ直後は入力を止める（既存2作の作法）
     ripples.length = 0; swap.t = 0;
-    state.charX = STAND_X; state.camX = 0;
+    state.charX = STAND_X; state.charOff = 0; state.camX = 0;
   }
 
   function currentChar() { return IDS[state.charIdx % IDS.length]; }
@@ -297,8 +299,11 @@
       return;
     }
     s.step++;
-    s.charX = j.x1;              // 着いた場所にそのまま立つ（次の間合いが変わる＝考慮要素が増える）
+    // 着いた場所にそのまま立つ（次の間合いが変わる＝考慮要素が増える）。
+    // 位置は台座の中心からのずれで持つ。そうしないと、揺れる台座だけが足元を滑ってしまう。
+    s.charOff = j.x1 - platX(next);
     s.plats.shift(); pushPlat(s);
+    s.charX = platX(s.plats[0]) + s.charOff;
     if (s.step % WEATHER_EVERY === 0) {
       // 同じ天候は続かない。月夜（基準）を重めに引いて、追い風と雨が「出来事」として立つようにする
       var bag = [];
@@ -831,6 +836,11 @@
 
     // カメラは「キャラが STAND_X に来る位置」を目指すが、**跳んでいる間は動かさない**。
     // 弧とカメラの移動が混ざると、右へ跳んでいるのに一度左へ流れて見える（2026-08-25 指摘）。
+    // 揺れる台座に乗って一緒に動く（跳んでいる間と落下中は除く）
+    if (s.phase === "play" && !s.jump && s.plats.length) {
+      s.charX = platX(s.plats[0]) + s.charOff;
+    }
+
     // 落下中は原則カメラを止める（追いかけると「どこで外したのか」が画面から消える）。
     // ただし大きく跳びすぎて画面の外に落ちる場合だけ、見える位置まで寄せる。
     if (s.phase === "fall" && s.fall) {
