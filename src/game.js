@@ -654,6 +654,56 @@
   });
   document.addEventListener("dblclick", function (e) { e.preventDefault(); }, { passive: false });
 
+  // ---- 描き味を既存2作（御霊おとし・式札かさね）に合わせるための道具 ----
+  var MINCHO = '"Shippori Mincho B1","Hiragino Mincho ProN",serif';
+  var ROUND = '"M PLUS Rounded 1c","Shippori Mincho B1",sans-serif';   // 数字はこちら（2作と同じ）
+  var LINE = "#6d5a33";                                                 // 金枠
+
+  // 字間を空けて描く。既存2作はラベルに .2em、題字に .3em を使っている
+  function textLS(text, x, y, ls, align) {
+    var chars = String(text).split("");
+    var w = 0, i;
+    for (i = 0; i < chars.length; i++) w += ctx.measureText(chars[i]).width + ls;
+    w -= ls;
+    var cx = align === "center" ? x - w / 2 : (align === "right" ? x - w : x);
+    for (i = 0; i < chars.length; i++) {
+      ctx.fillText(chars[i], cx, y);
+      cx += ctx.measureText(chars[i]).width + ls;
+    }
+    return w;
+  }
+  // 金のグラデ文字（式札かさねの .game-title と同じ配合）
+  function goldGrad(y, h) {
+    var g = ctx.createLinearGradient(0, y - h, 0, y + h * 0.35);
+    g.addColorStop(0.15, "#f6e5ae"); g.addColorStop(0.55, "#D9A94C"); g.addColorStop(0.85, "#F0CE7E");
+    return g;
+  }
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+  }
+  // 金枠のパネル（既存2作の .stats / .card と同じ質感）
+  function panel(x, y, w, h, r) {
+    roundRect(x, y, w, h, r || 8);
+    var g = ctx.createLinearGradient(0, y, 0, y + h);
+    g.addColorStop(0, "rgba(28,24,54,.88)"); g.addColorStop(1, "rgba(19,16,38,.92)");
+    ctx.fillStyle = g; ctx.fill();
+    ctx.strokeStyle = LINE; ctx.lineWidth = 1; ctx.stroke();
+    roundRect(x + 1.5, y + 1.5, w - 3, h - 3, (r || 8) - 1);
+    ctx.strokeStyle = "rgba(184,155,90,.25)"; ctx.lineWidth = 1; ctx.stroke();
+  }
+  function label(text, x, y, align) {   // 9px・字間.2em・補助色（2作のラベルと同じ）
+    ctx.font = "500 10px " + MINCHO; ctx.fillStyle = C.inkDim;
+    textLS(text, x, y, 2.0, align || "left");
+  }
+  function num(text, x, y, size, color, align) {   // 数字は丸ゴシック（2作と同じ）
+    ctx.font = "800 " + size + "px " + ROUND; ctx.fillStyle = color || C.ink;
+    ctx.textAlign = align || "left"; ctx.fillText(text, x, y); ctx.textAlign = "left";
+  }
+
   // ---- 描画 ----
   function drawBg(s) {
     var g = ctx.createLinearGradient(0, 0, 0, H);
@@ -885,41 +935,57 @@
     var w = WEATHER[s.weather];
     ctx.save();
 
-    // 上部の帯（天候をここで見せる。地の絵と文字がぶつからないよう薄く敷く）
-    var band = ctx.createLinearGradient(0, 0, 0, 108);
-    band.addColorStop(0, "rgba(12,12,22,.72)"); band.addColorStop(1, "rgba(12,12,22,0)");
-    ctx.fillStyle = band; ctx.fillRect(0, 0, W, 108);
+    // 上部の帯（絵と文字がぶつからないよう薄く敷く）
+    var band = ctx.createLinearGradient(0, 0, 0, 96);
+    band.addColorStop(0, "rgba(12,12,22,.74)"); band.addColorStop(1, "rgba(12,12,22,0)");
+    ctx.fillStyle = band; ctx.fillRect(0, 0, W, 96);
 
-    ctx.textAlign = "left";
-    ctx.fillStyle = C.ink; ctx.font = "700 32px 'Shippori Mincho B1',serif";
-    ctx.fillText(s.step + "段", 22, 54);
-    ctx.font = "600 15px 'Shippori Mincho B1',serif"; ctx.fillStyle = C.inkDim;
-    ctx.fillText("最高 " + best + "段", 22, 78);
+    // 左: 題字（金のグラデ・字間.14em）＋ローマ字（式札かさねの h1 と同じ作り）
+    ctx.font = "800 17px " + MINCHO;
+    ctx.fillStyle = goldGrad(26, 17);
+    textLS("月影とび", 16, 28, 2.4, "left");
+    ctx.font = "500 9px " + MINCHO; ctx.fillStyle = C.inkDim;
+    textLS("TSUKIKAGE TOBI", 16, 42, 2.0, "left");
 
-    // 天候（名前・効き・目安のバー）
-    ctx.textAlign = "right";
-    ctx.fillStyle = w.color; ctx.font = "700 24px 'Shippori Mincho B1',serif";
-    ctx.fillText(w.name, W - 22, 50);
-    ctx.fillStyle = C.inkDim; ctx.font = "600 14px 'Shippori Mincho B1',serif";
-    ctx.fillText(w.note, W - 22, 72);
-    // 距離の伸び縮みを目盛りで示す（真ん中が基準）
-    var bx = W - 118, by = 84, bw2 = 96;
-    ctx.strokeStyle = "rgba(232,228,216,.22)"; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + bw2, by); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(bx + bw2 / 2, by - 4); ctx.lineTo(bx + bw2 / 2, by + 4); ctx.stroke();
-    var mark = bx + bw2 / 2 + (w.mul - 1) * bw2 * 2.2;
-    ctx.fillStyle = w.color;
-    ctx.beginPath(); ctx.arc(Math.max(bx, Math.min(mark, bx + bw2)), by, 4, 0, Math.PI * 2); ctx.fill();
+    // 右: 金枠のスタッツ箱（段・最高）＋いまの御霊の顔
+    var faceR = 19, faceX = W - 16 - faceR;
+    var boxW = 150, boxH = 44, boxX = faceX - faceR - 10 - boxW, boxY = 14;
+    panel(boxX, boxY, boxW, boxH, 8);
+    label("だん", boxX + 14, boxY + 16, "left");
+    num(s.step, boxX + 14, boxY + 36, 20, C.ink, "left");
+    label("さいこう", boxX + 84, boxY + 16, "left");
+    num(best, boxX + 84, boxY + 36, 20, C.inkDim, "left");
 
+    var id = currentChar(), ic = icons[id];
+    ctx.save();
+    ctx.beginPath(); ctx.arc(faceX, boxY + boxH / 2, faceR, 0, Math.PI * 2);
+    ctx.fillStyle = C.night2; ctx.fill();
+    ctx.save(); ctx.clip();
+    if (ic && ic.complete && ic.naturalWidth) ctx.drawImage(ic, faceX - faceR, boxY + boxH / 2 - faceR, faceR * 2, faceR * 2);
+    ctx.restore();
+    ctx.strokeStyle = LINE; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.restore();
+
+    // 天候（左下に小さな金枠の札。既存2作の chip と同じ質感）
+    var cw = 116, ch = 30, cx0 = 16, cy0 = 52;
+    panel(cx0, cy0, cw, ch, 6);
+    ctx.font = "800 13px " + MINCHO; ctx.fillStyle = w.color;
+    var nameW = textLS(w.name, cx0 + 10, cy0 + 20, 1.6, "left");
+    ctx.font = "500 10px " + MINCHO; ctx.fillStyle = C.inkDim;
+    textLS(w.note, cx0 + 10 + nameW + 8, cy0 + 20, 0.8, "left");
+
+    // 会心の連（左の列。中央に置くとスタッツ箱と重なる）
     if (s.combo >= 2) {
-      ctx.textAlign = "center";
-      ctx.fillStyle = C.moon; ctx.font = "700 20px 'Shippori Mincho B1',serif";
-      ctx.fillText("会心 " + s.combo + "連", W / 2, 50);
+      var kw = 116, kh = 30, kx = 16, ky = cy0 + ch + 8;
+      panel(kx, ky, kw, kh, 6);
+      ctx.font = "500 9px " + MINCHO; ctx.fillStyle = C.inkDim;
+      var lw = textLS("かいしん", kx + 10, ky + 20, 2.0, "left");
+      num(s.combo + " 連", kx + 10 + lw + 10, ky + 21, 16, C.moon, "left");
     }
     ctx.restore();
   }
 
-  // 天候が変わった瞬間だけ、画面中央に短く出す（遊びは止めない）
+  // 天候が変わった瞬間だけ  // 天候が変わった瞬間だけ、画面中央に短く出す（遊びは止めない）
   function drawWeatherSwap(s, dt) {
     if (s.wxT <= 0) return;
     s.wxT = Math.max(0, s.wxT - dt * 0.9);
@@ -948,40 +1014,96 @@
 
   function drawTitle() {
     ctx.save();
-    ctx.textAlign = "center";
-    ctx.fillStyle = C.moon; ctx.font = "800 52px 'Shippori Mincho B1',serif";
-    ctx.fillText("月影とび", W / 2, 268);
-    ctx.fillStyle = C.ink; ctx.font = "600 17px 'Shippori Mincho B1',serif";
-    ctx.fillText("長押しで力を溜め、離して跳ぶ", W / 2, 312);
-    ctx.fillStyle = C.inkDim; ctx.font = "600 15px 'Shippori Mincho B1',serif";
-    ctx.fillText("式札の道を、月まで", W / 2, 338);
-    if (best > 0) { ctx.fillStyle = C.kindei; ctx.fillText("これまでの誉れ　" + best + "段・" + titleFor(best), W / 2, 372); }
-    ctx.fillStyle = C.ink; ctx.font = "700 18px 'Shippori Mincho B1',serif";
+
+    // 題字を載せる帳（金枠の板。既存2作のカードと同じ質感）
+    var cw = 330, ch = 210, cx0 = (W - cw) / 2, cy0 = 168;
+    panel(cx0, cy0, cw, ch, 12);
+
+    // 題字（金のグラデ＋淡い発光・字間.3em）
+    ctx.save();
+    ctx.shadowColor = "rgba(240,206,126,.30)"; ctx.shadowBlur = 14;
+    ctx.font = "800 36px " + MINCHO;
+    ctx.fillStyle = goldGrad(cy0 + 62, 36);
+    textLS("月影とび", W / 2, cy0 + 62, 10.8, "center");
+    ctx.restore();
+
+    ctx.font = "500 10px " + MINCHO; ctx.fillStyle = C.inkDim;
+    textLS("TSUKIKAGE TOBI", W / 2, cy0 + 84, 2.2, "center");
+
+    // 罫（2作のカード内の区切りと同じ）
+    ctx.strokeStyle = "rgba(184,155,90,.35)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(cx0 + 40, cy0 + 100); ctx.lineTo(cx0 + cw - 40, cy0 + 100); ctx.stroke();
+
+    ctx.font = "700 14px " + MINCHO; ctx.fillStyle = C.ink;
+    textLS("長押しで力を溜め、離して跳ぶ", W / 2, cy0 + 126, 1.2, "center");
+    ctx.font = "500 12px " + MINCHO; ctx.fillStyle = C.inkDim;
+    textLS("式札の道を、月まで", W / 2, cy0 + 148, 1.6, "center");
+
+    if (best > 0) {
+      ctx.font = "500 9px " + MINCHO; ctx.fillStyle = C.inkDim;
+      textLS("これまでのほまれ", W / 2, cy0 + 172, 2.2, "center");
+      ctx.font = "800 17px " + ROUND; ctx.fillStyle = C.kindei;
+      ctx.textAlign = "center"; ctx.fillText(best + "段  " + titleFor(best), W / 2, cy0 + 192); ctx.textAlign = "left";
+    }
+
     ctx.globalAlpha = 0.55 + Math.sin(performance.now() / 380) * 0.35;
-    ctx.fillText("画面を長押し", W / 2, 610);
+    ctx.font = "700 15px " + MINCHO; ctx.fillStyle = C.ink;
+    textLS("画面を長押し", W / 2, 596, 3.2, "center");
     ctx.globalAlpha = 1;
-    ctx.fillStyle = testMode ? C.shokko : "rgba(157,147,181,.5)";
-    ctx.font = "600 12px 'Shippori Mincho B1',serif";
-    ctx.fillText(testMode ? "試しモード（題字を3回タップで戻る）" : "題字を3回すばやくタップで試しモード", W / 2, 656);
+
+    ctx.font = "500 10px " + MINCHO;
+    ctx.fillStyle = testMode ? C.shokko : "rgba(157,147,181,.45)";
+    textLS(testMode ? "試しモード（題字を3回タップで戻る）" : "題字を3回すばやくタップで試しモード", W / 2, 648, 1.0, "center");
     ctx.restore();
   }
 
   function drawResult(s) {
+    var clear = s.step >= 50;
     ctx.save();
-    ctx.fillStyle = "rgba(10,10,20,.72)"; ctx.fillRect(0, 0, W, H);
-    ctx.textAlign = "center";
-    ctx.fillStyle = C.inkDim; ctx.font = "600 16px 'Shippori Mincho B1',serif";
-    ctx.fillText(s.overReason, W / 2, 214);
-    ctx.fillStyle = C.moon; ctx.font = "800 60px 'Shippori Mincho B1',serif";
-    ctx.fillText(s.step + "段", W / 2, 286);
-    ctx.fillStyle = C.ink; ctx.font = "700 24px 'Shippori Mincho B1',serif";
-    ctx.fillText(titleFor(s.step), W / 2, 326);
-    ctx.fillStyle = C.inkDim; ctx.font = "600 16px 'Shippori Mincho B1',serif";
-    ctx.fillText("会心 " + s.maxCombo + "連　／　最高 " + best + "段", W / 2, 360);
-    if (s.newBest) { ctx.fillStyle = C.kindei; ctx.font = "700 20px 'Shippori Mincho B1',serif"; ctx.fillText("自己最高を更新", W / 2, 396); }
-    ctx.fillStyle = C.ink; ctx.font = "700 18px 'Shippori Mincho B1',serif";
+    ctx.fillStyle = "rgba(10,10,20,.74)"; ctx.fillRect(0, 0, W, H);
+
+    var cw = 320, ch = 300, cx0 = (W - cw) / 2, cy0 = 186;
+    panel(cx0, cy0, cw, ch, 12);
+
+    // 見出し（2作と同じ: 通常は蝕紅、達成は金・字間.3em）
+    ctx.font = "800 21px " + MINCHO;
+    ctx.fillStyle = clear ? C.moon : C.shokko;
+    textLS(clear ? "満月成就" : "夜明け", W / 2, cy0 + 40, 6.3, "center");
+    ctx.font = "500 10px " + MINCHO; ctx.fillStyle = C.inkDim;
+    textLS(s.overReason, W / 2, cy0 + 60, 1.6, "center");
+
+    ctx.strokeStyle = "rgba(184,155,90,.35)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(cx0 + 36, cy0 + 76); ctx.lineTo(cx0 + cw - 36, cy0 + 76); ctx.stroke();
+
+    // 到達段数（丸ゴシック・2作の final-score と同じ扱い）
+    ctx.font = "500 9px " + MINCHO; ctx.fillStyle = C.inkDim;
+    textLS("とうたつ", W / 2, cy0 + 98, 2.4, "center");
+    num(s.step + "段", W / 2, cy0 + 146, 44, clear ? C.moon : C.ink, "center");
+
+    ctx.font = "700 17px " + MINCHO; ctx.fillStyle = C.ink;
+    textLS(titleFor(s.step), W / 2, cy0 + 176, 2.4, "center");
+
+    ctx.strokeStyle = "rgba(184,155,90,.22)";
+    ctx.beginPath(); ctx.moveTo(cx0 + 36, cy0 + 196); ctx.lineTo(cx0 + cw - 36, cy0 + 196); ctx.stroke();
+
+    // 会心と最高（左右に並べる。2作の stats と同じ字間）
+    ctx.font = "500 9px " + MINCHO; ctx.fillStyle = C.inkDim;
+    textLS("かいしん", cx0 + 74, cy0 + 218, 2.2, "center");
+    textLS("さいこう", cx0 + cw - 74, cy0 + 218, 2.2, "center");
+    num(s.maxCombo + " 連", cx0 + 74, cy0 + 244, 20, C.ink, "center");
+    num(best + "段", cx0 + cw - 74, cy0 + 244, 20, C.ink, "center");
+
+    if (s.newBest) {
+      ctx.font = "700 12px " + MINCHO; ctx.fillStyle = C.kindei;
+      textLS("じこさいこうを こうしん", W / 2, cy0 + 276, 2.0, "center");
+    } else if (s.test) {
+      ctx.font = "700 12px " + MINCHO; ctx.fillStyle = C.shokko;
+      textLS("試し（記録は残りません）", W / 2, cy0 + 276, 1.6, "center");
+    }
+
     ctx.globalAlpha = 0.55 + Math.sin(performance.now() / 380) * 0.35;
-    ctx.fillText("もう一夜", W / 2, 600);
+    ctx.font = "700 15px " + MINCHO; ctx.fillStyle = C.ink;
+    textLS("もう一夜", W / 2, 596, 3.2, "center");
     ctx.restore();
   }
 
@@ -1043,7 +1165,7 @@
       var y = GROUND_Y - Math.sin(Math.PI * k) * s.jump.peak;
       drawChar(s, x - s.camX, y, 1);
       if (k >= 1) land();
-    } else if (s.phase !== "result") {
+    } else if (s.phase !== "result" && s.phase !== "title") {
       // 結果画面では描かない。落ちて消えたキャラが、また台座の上に立って見えてしまうため
       var shake = 0;
       if (s.shake > 0) { s.shake = Math.max(0, s.shake - dt * 2.2); shake = Math.sin(now / 24) * s.shake * 6; }

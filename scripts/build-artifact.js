@@ -37,7 +37,7 @@ const style = page.match(/<style>([\s\S]*?)<\/style>/)[1];
 const html = `<title>月影とび</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@500;700;800&family=M+PLUS+Rounded+1c:wght@800&display=swap" rel="stylesheet">
 <style>
 /* Artifact は body の背景を自分で塗らないと、閲覧側のテーマの地色が透けてしまう */
 html,body{height:100%;background:#131320;}
