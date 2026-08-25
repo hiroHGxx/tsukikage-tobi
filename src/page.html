@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#131320">
+<title>月影とび｜月蝕綺譚 二次創作</title>
+<meta name="description" content="長押しで力を溜めて離す。宵闇に浮かぶ式札の飛び石を渡り、何段先まで届くかを競う。『月蝕綺譚 -Luna Occulta-』の二次創作ファンゲーム。">
+<meta property="og:title" content="月影とび">
+<meta property="og:description" content="力を溜めて、離して跳ぶ。式札の道を、月まで。">
+<meta property="og:type" content="website">
+<meta property="og:image" content="ogp.png">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 fill=%22%23131320%22/%3E%3Ccircle cx=%2216%22 cy=%2213%22 r=%228%22 fill=%22%23F0CE7E%22/%3E%3Crect x=%228%22 y=%2224%22 width=%2216%22 height=%223%22 rx=%221%22 fill=%22%23D9A94C%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&display=swap" rel="stylesheet">
+<style>
+  /* トンマナ「宵闇に金」— 正本は公式MCP kitan-lore の get_design_tone */
+  :root{
+    --night:#131320; --night-2:#1B1B2E; --ink:#E8E4D8; --ink-dim:#9D93B5;
+    --moon:#F0CE7E; --kindei:#D9A94C; --shokko:#E0562F; --anshi:#8E6B9E;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;background:var(--night);overflow:hidden;}
+  body{
+    display:flex;align-items:center;justify-content:center;
+    font-family:"Shippori Mincho B1","Hiragino Mincho ProN","Yu Mincho",serif;
+    color:var(--ink);
+    /* iOS: ダブルタップズームと長押しメニューを止める（両既存作と同じ罠） */
+    touch-action:manipulation;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;
+    -webkit-tap-highlight-color:transparent;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  /* 論理480x720の比を保つ（引き伸ばすと当たり判定と見た目がずれる） */
+  #stage{position:relative;aspect-ratio:480/720;width:min(100vw,calc(100vh*0.6667));height:auto;max-height:100vh;}
+  canvas{display:block;width:100%;height:100%;}
+  /* 画面外の説明（読み上げ・検索向け。表示はしない） */
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);}
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="cv"></canvas></div>
+<p class="sr">長押しで力を溜め、離して跳びます。式札の飛び石に着地し、何段先まで届くかを競うゲームです。</p>
+<script src="chars.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
