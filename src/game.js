@@ -321,14 +321,14 @@
       s.combo++;
       s.maxCombo = Math.max(s.maxCombo, s.combo);
       flash("会心", C.moon);
-      se("zan", 0.5);
+      se("kiwami", 0.55);        // 会心は「極」。跳躍（斬）と区別する
       if (s.combo >= 2) se("combo", Math.min(0.45 + s.combo * 0.06, 0.95));
     } else {
       s.combo = 0;
       se("count", 0.55);
     }
     // 節目（10段ごと）
-    if (s.step % 10 === 0) { se("kiwami", 0.9); flash(s.step + "段", C.kindei); }
+    if (s.step % 10 === 0) { se("fukaku", 0.85); flash(s.step + "段", C.kindei); }
     // 5段ごとに御霊が交代する（34体を巡回＝素材がそのまま尺になる）
     if (s.step % 5 === 0) { s.charIdx++; showSwap(currentChar()); se("zan", 0.55); }
     // 満月（50段）
@@ -357,7 +357,6 @@
     f.x += f.vx * dt;
     f.y += f.vy * dt;
     f.rot += f.rv * dt;
-    if (f.t > 0.28 && f.t < 0.34) se("fukaku", 0.85);
     if (f.y > H + 160) { s.fall = null; gameOver(); }
   }
 

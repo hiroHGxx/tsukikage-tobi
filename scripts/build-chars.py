@@ -61,7 +61,9 @@ def main():
     # 背景は白なので、外側とつながった白だけを塗り抜く（衣装の白を残すため）。
     from extract_chibi import ndimage as _nd
     canon = {}
-    for a in [x for x in items if x.get("id","").endswith("_canon")]:
+    # 同じキャラに _canon で終わるIDが複数あることがある（シャオランの相棒 riri_canon、
+    # 咲耶の晴れ着・浴衣など）。**本人の <id>_canon だけ**を採る。
+    for a in [x for x in items if x.get("char") and x.get("id") == x["char"] + "_canon"]:
         cid = a["char"]
         if cid not in out: continue
         src = fetch(a["url"], os.path.join(CACHE, f"{cid}_canon.png"))
