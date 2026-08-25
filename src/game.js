@@ -54,11 +54,14 @@
   };
 
   // ---- 称号（到達段数）----
+  // **栞のボイスと1対1で対応させる**（docs/VOICE.md の r0〜r4）。
+  // 画面に出る称号と、読み上げる称号がずれていると気持ちが悪いため、段の区切りも声に合わせた。
   var TITLES = [
-    { n: 0, t: "宵の踏み出し" }, { n: 5, t: "石渡り" }, { n: 10, t: "夜歩き" },
-    { n: 16, t: "影伝い" }, { n: 22, t: "月見の足" }, { n: 30, t: "宵の名手" },
-    { n: 38, t: "闇夜の跳ね手" }, { n: 46, t: "月影を継ぐ者" }, { n: 50, t: "満月渡り" },
-    { n: 70, t: "月に届いた者" }
+    { n: 0, t: "宵の踏み出し" },    // 声 r0「まだ一ページ目、ですこと」
+    { n: 10, t: "夜歩き" },         // 声 r1「よあるき、ですこと」
+    { n: 22, t: "月見の足" },       // 声 r2「つきみの足、ですこと」
+    { n: 38, t: "闇夜の跳ね手" },   // 声 r3「やみよの跳ね手、ですこと」
+    { n: 50, t: "満月渡り" }        // 声 r4「まんげつわたり」／r5（満月を越えて落ちたとき）
   ];
   function titleFor(n) {
     var t = TITLES[0].t;
@@ -166,7 +169,7 @@
   }
   // ---- ボイス（栞・公式指定のElevenLabs Voice ID で制作）----
   // 台詞は docs/VOICE.md。音源が無ければ黙って何も鳴らさない（差し替え前でも遊べる）
-  var VOICE_KEYS = ["start", "r0", "r1", "r2", "r3", "r4"];
+  var VOICE_KEYS = ["start", "r0", "r1", "r2", "r3", "r4", "r5"];
   var voiceBuf = {}, voicePlaying = null;
   function loadVoice() {
     var a = audioCtx(); if (!a) return;
@@ -196,6 +199,7 @@
   }
   // 到達段数から、結果で読む台詞を選ぶ
   function resultVoiceKey(step) {
+    if (step > 50) return "r5";      // 満月のさらに先で落ちた
     if (step >= 50) return "r4";
     if (step >= 38) return "r3";
     if (step >= 22) return "r2";
@@ -277,8 +281,18 @@
   // こちらは溜めた長さを距離に変換するぶん誤差が乗り、台座も揺れるので、7pxまで締めると運になる。
   // その中間を取る。幅は石垣の上に描き、キャラの中心も足元に印で出す（見えない判定にしない）。
   function perfectWinFor(step) { return Math.max(16 - step * 0.22, 9); }
-  // 12段までは静止。以降ゆっくり左右に揺れ、終盤の主役になる
-  function driftFor(step) { return step < 12 ? 0 : Math.min((step - 12) * 0.85, 26); }
+  // 12段までは静止。以降ゆっくり左右に揺れ、終盤の主役になる。
+  // 50段（満月）を越えたら振幅をもう少し伸ばし、揺れの周期を速くする
+  // （それまでに幅・間合い・会心の窓が下限に達していて、難度が頭打ちになるため）
+  function driftFor(step) {
+    if (step < 12) return 0;
+    var amp = Math.min((step - 12) * 0.85, 26);
+    if (step > 50) amp = Math.min(26 + (step - 50) * 0.22, 38);
+    return amp;
+  }
+  function driftSpeedFor(step) {        // 周期(ms)。小さいほど速い
+    return step <= 50 ? 900 : Math.max(900 - (step - 50) * 9, 420);
+  }
 
   function pushPlat(s) {
     var last = s.plats[s.plats.length - 1];
@@ -287,21 +301,21 @@
     var w = widthFor(n);
     s.plats.push({
       x: last.x + last.w / 2 + gap + w / 2, w: w,
-      amp: driftFor(n), ph: Math.random() * Math.PI * 2
+      amp: driftFor(n), spd: driftSpeedFor(n), ph: Math.random() * Math.PI * 2
     });
   }
   // 台座の実際の位置（左右に揺れるものがある）
-  function platX(p) { return p.amp ? p.x + Math.sin(performance.now() / 900 + p.ph) * p.amp : p.x; }
+  function platX(p) { return p.amp ? p.x + Math.sin(performance.now() / (p.spd || 900) + p.ph) * p.amp : p.x; }
 
   function reset() {
     var keepBestMoon = state ? state.moonPhase : 0;
     state = newState();
     state.moonPhase = keepBestMoon;
     state.charIdx = 0;
-    state.plats = [{ x: STAND_X, w: 130, amp: 0, ph: 0 }];
+    state.plats = [{ x: STAND_X, w: 130, amp: 0, spd: 900, ph: 0 }];
     for (var i = 0; i < 4; i++) pushPlat(state);
     lockUntil = performance.now() + 700;   // 開始・リトライ直後は入力を止める（既存2作の作法）
-    ripples.length = 0; swap.t = 0;
+    ripples.length = 0; swap.t = 0; rite.t = 0;
     state.charX = STAND_X; state.charOff = 0; state.camX = 0;
     state.order = shuffled(IDS);   // 毎回ちがう御霊から始まり、ちがう順で出る
     state.test = testMode;
@@ -404,11 +418,13 @@
       s.combo = 0;      // 通常の着地は無音（音を足しすぎない）
     }
     // 節目（10段ごと）
-    if (Math.floor(s.step / 10) > Math.floor(prevStep / 10)) { flash(s.step + "段", C.kindei); }
+    if (Math.floor(s.step / 10) > Math.floor(prevStep / 10) && !(prevStep < 50 && s.step >= 50)) {
+      flash(s.step + "段", C.kindei);   // 50段は満月成就の儀に譲る
+    }
     // 5段ごとに御霊が交代する（34体を巡回＝素材がそのまま尺になる）
     if (Math.floor(s.step / SWAP_EVERY) > Math.floor(prevStep / SWAP_EVERY)) { s.charIdx++; showSwap(currentChar()); }
     // 満月（50段）
-    if (prevStep < 50 && s.step >= 50) { flash("満月成就", C.moon); se("kiwami", 1.0); }
+    if (prevStep < 50 && s.step >= 50) moonRite();
     s.moonPhase = Math.max(s.moonPhase, Math.min(s.step / 50, 1));
   }
 
@@ -441,6 +457,68 @@
   }
 
   function flash(text, color) { state.flash = 1.0; state.flashText = text; state.flashColor = color; }
+
+  // 満月成就（50段）の演出。御霊おとしの皆既月蝕にならい、1.8秒だけ手を止めて見せる。
+  // 帳のときと同じで、終わるまで跳べない（lockUntil）。
+  var rite = { t: 0, sparks: [] };
+  function moonRite() {
+    rite.t = 1.0;
+    rite.sparks = [];
+    for (var i = 0; i < 46; i++) {
+      rite.sparks.push({
+        x: Math.random() * W, y: H * (0.55 + Math.random() * 0.5),
+        v: 40 + Math.random() * 120, r: 1 + Math.random() * 2.4, ph: Math.random() * 6.28
+      });
+    }
+    lockUntil = performance.now() + 1900;
+    se("kiwami", 1.0);
+    setTimeout(function () { se("fukaku", 0.7); }, 620);
+  }
+  function drawRite(dt) {
+    if (rite.t <= 0) return;
+    rite.t = Math.max(0, rite.t - dt / 1.9);
+    var p = 1 - rite.t;                    // 0→1
+    var fade = p < 0.12 ? p / 0.12 : (p > 0.82 ? Math.max(0, (1 - p) / 0.18) : 1);
+
+    ctx.save();
+    // 宵闇を一段深くして、月だけを残す
+    ctx.globalAlpha = 0.90 * fade;
+    ctx.fillStyle = "#08080f"; ctx.fillRect(0, 0, W, H);
+
+    // 月の光が満ちて広がる
+    var mx = 360, my = 118, mr = 46 * (1 + p * 0.5);
+    ctx.globalAlpha = fade;
+    var glow = ctx.createRadialGradient(mx, my, mr * 0.5, mx, my, mr * (3.4 + p * 2.4));
+    glow.addColorStop(0, "rgba(240,206,126,.55)"); glow.addColorStop(1, "rgba(240,206,126,0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(mx, my, mr * (3.4 + p * 2.4), 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = C.moon;
+    ctx.beginPath(); ctx.arc(mx, my, mr, 0, Math.PI * 2); ctx.fill();
+
+    // 金の粉が立ちのぼる
+    for (var i = 0; i < rite.sparks.length; i++) {
+      var sp = rite.sparks[i];
+      sp.y -= sp.v * dt;
+      ctx.globalAlpha = fade * (0.25 + 0.55 * Math.abs(Math.sin(sp.ph + p * 6)));
+      ctx.fillStyle = C.moon;
+      ctx.beginPath(); ctx.arc(sp.x + Math.sin(sp.ph + p * 4) * 8, sp.y, sp.r, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // 大文字（式札かさねの満願と同じ字間・金泥）
+    ctx.globalAlpha = fade;
+    var ease = 1 - Math.pow(1 - Math.min(p / 0.22, 1), 3);
+    ctx.save();
+    ctx.shadowColor = "rgba(240,206,126,.45)"; ctx.shadowBlur = 22;
+    ctx.font = "800 " + (30 + 12 * ease) + "px " + MINCHO;
+    ctx.fillStyle = goldGrad(566, 40);
+    textLS("満月成就", W / 2, 566, 13 * ease, "center");
+    ctx.restore();
+    ctx.font = "500 12px " + MINCHO; ctx.fillStyle = C.ink;
+    textLS("五十段の高みで、満月に逢えた", W / 2, 600, 2.0, "center");
+    ctx.font = "700 15px " + MINCHO; ctx.fillStyle = C.kindei;
+    textLS("この先も、記録は伸ばせる", W / 2, 628, 2.0, "center");
+    ctx.restore();
+  }
 
   // 着地の波紋（会心は金・通常は淡く）
   var ripples = [];
@@ -602,7 +680,7 @@
       s.charOff = 0; s.charX = platX(s.plats[0]);
       s.moonPhase = Math.max(s.moonPhase, Math.min(s.step / 50, 1));
       if (Math.floor(s.step / SWAP_EVERY) > Math.floor(prev / SWAP_EVERY)) { s.charIdx++; showSwap(currentChar()); }
-      flash(s.step + "段", C.kindei);
+      if (prev < 50 && s.step >= 50) moonRite(); else flash(s.step + "段", C.kindei);
     } else if (b.i === 2) {                            // 次の御霊のカットインを見る
       s.charIdx++; showSwap(currentChar());
     } else if (b.i === 3) {                            // 台詞を順に鳴らす
@@ -1170,10 +1248,11 @@
 
     drawRipples(dt, s.camX);
     if (s.phase === "play" || s.phase === "fall") drawWeatherFx(s, dt);
-    if (s.phase === "play" || s.phase === "fall") drawHud(s);
+    if ((s.phase === "play" || s.phase === "fall") && rite.t <= 0) drawHud(s);
     drawSwap(dt, 1);
     if (s.phase === "play") drawWeatherSwap(s, dt);
-    drawFlash(s, dt);
+    if (rite.t <= 0) drawFlash(s, dt);
+    drawRite(dt);
     drawTestBar(s);
     if (s.phase === "result") drawResult(s);
 

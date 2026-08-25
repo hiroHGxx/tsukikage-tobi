@@ -3,7 +3,7 @@
 
 使い方:
     python3 scripts/prep_voice.py <落としたmp3> <キー>
-    # キー: start / r0 / r1 / r2 / r3 / r4（docs/VOICE.md 参照）
+    # キー: start / r0 / r1 / r2 / r3 / r4 / r5（docs/VOICE.md 参照）
 
 やること:
   ①前後の無音を落とす（v3は末尾に数秒の無音が付くことがある）
@@ -30,7 +30,7 @@ def decode(path):
 
 def main():
     if len(sys.argv) < 3:
-        sys.exit("使い方: python3 scripts/prep_voice.py <mp3> <start|r0|r1|r2|r3|r4>")
+        sys.exit("使い方: python3 scripts/prep_voice.py <mp3> <start|r0|r1|r2|r3|r4|r5>")
     src, key = sys.argv[1], sys.argv[2]
     a = decode(src)
     if len(a) == 0:
