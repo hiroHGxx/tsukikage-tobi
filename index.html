@@ -1031,7 +1031,8 @@ const ICON = {
       var y = GROUND_Y - Math.sin(Math.PI * k) * s.jump.peak;
       drawChar(s, x - s.camX, y, 1);
       if (k >= 1) land();
-    } else {
+    } else if (s.phase !== "result") {
+      // 結果画面では描かない。落ちて消えたキャラが、また台座の上に立って見えてしまうため
       var shake = 0;
       if (s.shake > 0) { s.shake = Math.max(0, s.shake - dt * 2.2); shake = Math.sin(now / 24) * s.shake * 6; }
       drawChar(s, px + shake, py, 1);
