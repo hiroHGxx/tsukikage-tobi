@@ -65,7 +65,7 @@ async function run(base, hash, until, timeout, shot) {
     { name: "御霊の交代（立ち絵が出る）", hash: "#autoperfect",
       until: "window.__tsukikage.swap.t > 0.55 && window.__tsukikage.state.step >= 10",
       timeout: 40000, shot: "/tmp/tsukikage-swap.png" },
-    { name: "交代カットイン・30段（雛之丞）", hash: "#autoperfect",
+    { name: "交代カットイン・30段台", hash: "#autoperfect",
       until: "window.__tsukikage.swap.t > 0.55 && window.__tsukikage.state.step >= 30",
       timeout: 90000, shot: "/tmp/tsukikage-swap30.png" },
     { name: "外したときの落下（画面下へ落ちる）", hash: "#automiss",

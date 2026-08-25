@@ -186,7 +186,10 @@ const ICON = {
     { id: "oikaze", name: "追い風", note: "伸びすぎる", mul: 1.16, color: "#F0CE7E" },
     { id: "ame", name: "雨", note: "伸びない", mul: 0.86, color: "#5FB4D9" }
   ];
-  var WEATHER_EVERY = 8;   // 何段ごとに変わるか
+  var WEATHER_EVERY = 8;   // 天候が変わる段数
+  // 御霊が交代する段数。30体を5段ごとだと全員に会うのに150段かかり、
+  // 20〜30段で終わる遊びでは大半の御霊が一度も出ない（2026-08-25 指摘）
+  var SWAP_EVERY = 4;
 
   // 御霊の肩書き（公式MCP list_spirits の tagline）
   var TAGS = {
@@ -359,6 +362,7 @@ const ICON = {
       flash: 0, flashText: "", flashColor: C.moon,
       moonPhase: 0,         // 0..1（最高到達段に応じて満ちる）
       weather: 0, wxT: 0,   // 天候の番号と、切り替え表示の残り
+      order: null,           // その回の御霊の並び（毎回シャッフルする）
       charX: 0, charOff: 0,  // キャラの位置。charOff は「台座の中心からのずれ」で、
                              // 揺れる台座に乗って一緒に動くために保つ
       overReason: ""
@@ -405,9 +409,21 @@ const ICON = {
     lockUntil = performance.now() + 700;   // 開始・リトライ直後は入力を止める（既存2作の作法）
     ripples.length = 0; swap.t = 0;
     state.charX = STAND_X; state.charOff = 0; state.camX = 0;
+    state.order = shuffled(IDS);   // 毎回ちがう御霊から始まり、ちがう順で出る
   }
 
-  function currentChar() { return IDS[state.charIdx % IDS.length]; }
+  function shuffled(arr) {
+    var a = arr.slice();
+    for (var i = a.length - 1; i > 0; i--) {   // Fisher-Yates
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+  function currentChar() {
+    var o = state.order || IDS;
+    return o[state.charIdx % o.length];
+  }
   function isHeavy(id) { return !!HEAVY[id]; }
 
   // ---- 跳ぶ ----
@@ -479,7 +495,7 @@ const ICON = {
     // 節目（10段ごと）
     if (s.step % 10 === 0) { se("fukaku", 0.85); flash(s.step + "段", C.kindei); }
     // 5段ごとに御霊が交代する（34体を巡回＝素材がそのまま尺になる）
-    if (s.step % 5 === 0) { s.charIdx++; showSwap(currentChar()); se("zan", 0.55); }
+    if (s.step % SWAP_EVERY === 0) { s.charIdx++; showSwap(currentChar()); se("zan", 0.55); }
     // 満月（50段）
     if (s.step === 50) { flash("満月成就", C.moon); se("kiwami", 1.0); }
     s.moonPhase = Math.max(s.moonPhase, Math.min(s.step / 50, 1));
