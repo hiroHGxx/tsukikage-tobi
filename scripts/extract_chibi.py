@@ -47,8 +47,26 @@ def extract_front(path, box=200):
         y0, y1 = ys.min(), ys.max()+1
         if (x1-x0) / max(1, (y1-y0)) >= 0.85: continue
         cut = np.array(img)[y0:y1, x0:x1].copy()
-        cut[:,:,3] = np.where(outside[y0:y1, x0:x1], 0, 255).astype(np.uint8)
+        keep = ~outside[y0:y1, x0:x1]
+
+        # 立ち絵以外の破片（隣の小物や面など）が混ざることがあるので、
+        # つながったかたまりのうち一番大きいものだけを残す（狐白の足元に狐の面が入っていた）
+        lab2, n2 = ndimage.label(keep)
+        if n2 > 1:
+            sizes = ndimage.sum(keep, lab2, range(1, n2 + 1))
+            main = int(np.argmax(sizes)) + 1
+            keep = (lab2 == main)
+            ys2, xs2 = np.where(keep)
+            if len(xs2):
+                a0, a1, b0, b1 = xs2.min(), xs2.max() + 1, ys2.min(), ys2.max() + 1
+                cut = cut[b0:b1, a0:a1]
+                keep = keep[b0:b1, a0:a1]
+
+        cut[:,:,3] = np.where(keep, 255, 0).astype(np.uint8)
         out = Image.fromarray(cut, "RGBA")
-        out.thumbnail((box, box), Image.LANCZOS)
+        # 細身のキャラ（弁天など）は同じ高さだと存在感が痩せるので、幅の下限で少しだけ持ち上げる
+        ratio = out.width / out.height
+        h = box if ratio >= 0.42 else min(int(box * (0.42 / ratio) ** 0.5), int(box * 1.16))
+        out.thumbnail((int(box * 1.2), h), Image.LANCZOS)
         return out
     return None

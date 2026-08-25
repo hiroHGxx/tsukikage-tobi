@@ -210,7 +210,9 @@
     return base + Math.random() * jitter;
   }
   function widthFor(step) { return Math.max(116 - step * 1.35, 64); }
-  function perfectWinFor(step) { return Math.max(26 - step * 0.28, 13); }
+  // 会心の許容（中心からの px）。緩いと「足半分ずれても会心」になるので締める。
+  // ただし下限は切らない（0にすると運ゲーになる）。この幅は石垣の上に描いて見せる。
+  function perfectWinFor(step) { return Math.max(20 - step * 0.26, 10); }
   // 12段までは静止。以降ゆっくり左右に揺れ、終盤の主役になる
   function driftFor(step) { return step < 12 ? 0 : Math.min((step - 12) * 0.85, 26); }
 
@@ -282,8 +284,14 @@
     s.charX = j.x1;              // 着いた場所にそのまま立つ（次の間合いが変わる＝考慮要素が増える）
     s.plats.shift(); pushPlat(s);
     if (s.step % WEATHER_EVERY === 0) {
-      var nw = (s.weather + 1 + Math.floor(Math.random() * (WEATHER.length - 1))) % WEATHER.length;
-      s.weather = nw; s.wxT = 1.0; se("count", 0.7);
+      // 同じ天候は続かない。月夜（基準）を重めに引いて、追い風と雨が「出来事」として立つようにする
+      var bag = [];
+      for (var wi = 0; wi < WEATHER.length; wi++) {
+        if (wi === s.weather) continue;
+        bag.push(wi); if (wi === 0) bag.push(0);   // 月夜は2枚
+      }
+      s.weather = bag[Math.floor(Math.random() * bag.length)];
+      s.wxT = 1.0; se("count", 0.7);
     }
 
     var win = perfectWinFor(s.step);
@@ -500,7 +508,7 @@
     ctx.restore();
   }
 
-  function drawPlat(p, camX) {
+  function drawPlat(p, camX, win) {
     var x = platX(p) - camX, y = GROUND_Y;
     var w = p.w, h = 38;
     ctx.save();
@@ -542,11 +550,23 @@
       }
     }
 
-    // 縁の金（式札の名残・会心の目安になる中央の印）
+    // 縁の金
     ctx.strokeStyle = "rgba(240,206,126,.5)"; ctx.lineWidth = 1.2;
     ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(R, y); ctx.stroke();
-    ctx.strokeStyle = "rgba(240,206,126,.85)"; ctx.lineWidth = 1.6;
-    ctx.beginPath(); ctx.moveTo(x, y - 5); ctx.lineTo(x, y + 8); ctx.stroke();
+
+    // 会心の範囲（ここに乗れば会心。判定は見えていないと不公平になるので描く）
+    if (win) {
+      var wl = Math.max(L + 1, x - win), wr = Math.min(R - 1, x + win);
+      var zone = ctx.createLinearGradient(0, y, 0, y + 9);
+      zone.addColorStop(0, "rgba(240,206,126,.42)"); zone.addColorStop(1, "rgba(240,206,126,.10)");
+      ctx.fillStyle = zone;
+      ctx.beginPath(); ctx.moveTo(wl, y); ctx.lineTo(wr, y); ctx.lineTo(wr - 1.5, y + 9); ctx.lineTo(wl + 1.5, y + 9); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = "rgba(240,206,126,.55)"; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(wl, y - 1); ctx.lineTo(wl, y + 9); ctx.moveTo(wr, y - 1); ctx.lineTo(wr, y + 9); ctx.stroke();
+    }
+    // 中央の印
+    ctx.strokeStyle = "rgba(240,206,126,.9)"; ctx.lineWidth = 1.6;
+    ctx.beginPath(); ctx.moveTo(x, y - 5); ctx.lineTo(x, y + 9); ctx.stroke();
     ctx.restore();
   }
 
@@ -713,7 +733,7 @@
     }
 
     drawBg(s);
-    for (var i = 0; i < s.plats.length; i++) drawPlat(s.plats[i], s.camX);
+    for (var i = 0; i < s.plats.length; i++) drawPlat(s.plats[i], s.camX, i === 0 ? 0 : perfectWinFor(s.step + i));
 
     var px = s.charX - s.camX, py = GROUND_Y;
     if (s.jump) {
