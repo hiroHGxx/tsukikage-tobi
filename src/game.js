@@ -210,9 +210,11 @@
     return base + Math.random() * jitter;
   }
   function widthFor(step) { return Math.max(116 - step * 1.35, 64); }
-  // 会心の許容（中心からの px）。緩いと「足半分ずれても会心」になるので締める。
-  // ただし下限は切らない（0にすると運ゲーになる）。この幅は石垣の上に描いて見せる。
-  function perfectWinFor(step) { return Math.max(20 - step * 0.26, 10); }
+  // 会心の許容（**キャラの中心**と石垣の中心の距離・px）。
+  // 式札かさねは ±7px（PERFECT_TOL）だったが、あちらは一定速度で動く札を止める＝狙いが「いつ押すか」の1点。
+  // こちらは溜めた長さを距離に変換するぶん誤差が乗り、台座も揺れるので、7pxまで締めると運になる。
+  // その中間を取る。幅は石垣の上に描き、キャラの中心も足元に印で出す（見えない判定にしない）。
+  function perfectWinFor(step) { return Math.max(16 - step * 0.22, 9); }
   // 12段までは静止。以降ゆっくり左右に揺れ、終盤の主役になる
   function driftFor(step) { return step < 12 ? 0 : Math.min((step - 12) * 0.85, 26); }
 
@@ -584,6 +586,16 @@
       ctx.beginPath(); ctx.ellipse(x, GROUND_Y + 3, w * 0.32 * sh, 4 * sh, 0, 0, Math.PI * 2); ctx.fill();
       ctx.restore();
       ctx.drawImage(im, x - w / 2, y - hgt, w, hgt);
+      // 中心の印。会心は「体が帯に重なるか」ではなく「中心が帯に入るか」で決まるため、
+      // 見比べる点をはっきり出す（2026-08-25 指摘）
+      if (Math.abs(y - GROUND_Y) < 0.5) {
+        ctx.save();
+        ctx.fillStyle = "rgba(240,206,126,.95)";
+        ctx.beginPath();
+        ctx.moveTo(x, GROUND_Y - 1); ctx.lineTo(x - 4.5, GROUND_Y - 9); ctx.lineTo(x + 4.5, GROUND_Y - 9);
+        ctx.closePath(); ctx.fill();
+        ctx.restore();
+      }
     } else {
       ctx.fillStyle = C.ink; ctx.fillRect(x - 12, y - hgt, 24, hgt);
     }
