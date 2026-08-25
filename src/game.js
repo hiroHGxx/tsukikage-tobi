@@ -29,6 +29,15 @@
     shiori: "栞", tart: "タルト", torika: "酉花", uka: "宇迦", xiaolan: "シャオラン", yui: "結"
   };
 
+  // ---- 天候（距離が変わる。キャラごとの癖の代わりに「場」に変化を持たせる）----
+  // 画面を見れば分かり、説明が要らず、キャラ間のバランス調整も要らない（2026-08-25 オーナー案）
+  var WEATHER = [
+    { id: "tsukiyo", name: "月夜", note: "いつも通り", mul: 1.00, color: "#E8E4D8" },
+    { id: "oikaze", name: "追い風", note: "伸びすぎる", mul: 1.16, color: "#F0CE7E" },
+    { id: "ame", name: "雨", note: "伸びない", mul: 0.86, color: "#5FB4D9" }
+  ];
+  var WEATHER_EVERY = 8;   // 何段ごとに変わるか
+
   // ---- 称号（到達段数）----
   var TITLES = [
     { n: 0, t: "宵の踏み出し" }, { n: 5, t: "石渡り" }, { n: 10, t: "夜歩き" },
@@ -186,6 +195,8 @@
       shake: 0,             // ノーチャージ保護の「震え」
       flash: 0, flashText: "", flashColor: C.moon,
       moonPhase: 0,         // 0..1（最高到達段に応じて満ちる）
+      weather: 0, wxT: 0,   // 天候の番号と、切り替え表示の残り
+      charX: 0,             // キャラの実際の位置（着地した場所にそのまま立つ）
       overReason: ""
     };
   }
@@ -225,6 +236,7 @@
     for (var i = 0; i < 4; i++) pushPlat(state);
     lockUntil = performance.now() + 700;   // 開始・リトライ直後は入力を止める（既存2作の作法）
     ripples.length = 0; swap.t = 0;
+    state.charX = STAND_X; state.camX = 0;
   }
 
   function currentChar() { return IDS[state.charIdx % IDS.length]; }
@@ -241,17 +253,15 @@
     if (held < 0.15) { s.shake = 0.35; se("whiff", 0.5); return; }
 
     var t = Math.min(held, 1.0);
-    var heavy = isHeavy(currentChar());
     // 重い御霊は「同じ溜めでは伸びない」（序盤〜中盤で2割ほど短い）が、最大射程は同じにする。
     // 射程そのものを詰めると、終盤の間合いに届かなくなって詰むため（2026-08-25 修正）。
-    var curve = heavy ? Math.pow(t, 1.45) : t;
-    var dist = 72 + curve * 300;
+    var dist = (72 + t * 300) * WEATHER[s.weather].mul;
     var cur = s.plats[0], next = s.plats[1];
-    var landX = platX(cur) + dist;
+    var landX = s.charX + dist;   // 台座の中央ではなく、いま立っている場所から跳ぶ
     var dur = 0.34 + Math.min(dist / 900, 0.34);
-    var peak = (heavy ? 76 : 132) + dist * (heavy ? 0.16 : 0.30);
+    var peak = 118 + dist * 0.30;
 
-    s.jump = { t: 0, dur: dur, x0: platX(cur), x1: landX, peak: peak, dist: dist, next: next };
+    s.jump = { t: 0, dur: dur, x0: s.charX, x1: landX, peak: peak, dist: dist, next: next };
     se("zan", 0.8);
     if (DBG.stat) statLog.push({ step: s.step, held: +held.toFixed(3), dist: Math.round(dist), target: Math.round(next.x - cur.x) });
   }
@@ -269,7 +279,12 @@
       return;
     }
     s.step++;
+    s.charX = j.x1;              // 着いた場所にそのまま立つ（次の間合いが変わる＝考慮要素が増える）
     s.plats.shift(); pushPlat(s);
+    if (s.step % WEATHER_EVERY === 0) {
+      var nw = (s.weather + 1 + Math.floor(Math.random() * (WEATHER.length - 1))) % WEATHER.length;
+      s.weather = nw; s.wxT = 1.0; se("count", 0.7);
+    }
 
     var win = perfectWinFor(s.step);
     ripple(j.x1, GROUND_Y + 12, d <= win);
@@ -322,7 +337,7 @@
     var ic = icons[swap.id];
     ctx.save();
     ctx.globalAlpha = a;
-    var cx = W / 2, cy = 200;
+    var cx = W / 2, cy = 168;
     if (ic && ic.complete && ic.naturalWidth) {
       var r = 44;
       ctx.save();
@@ -335,9 +350,9 @@
     ctx.textAlign = "center";
     ctx.fillStyle = C.ink; ctx.font = "700 21px 'Shippori Mincho B1',serif";
     ctx.fillText(NAMES[swap.id] || swap.id, cx, cy + 74);
-    ctx.fillStyle = isHeavy(swap.id) ? C.anshi : C.kindei;
-    ctx.font = "700 15px 'Shippori Mincho B1',serif";
-    ctx.fillText(isHeavy(swap.id) ? "重い　溜めが要る" : "軽い　よく伸びる", cx, cy + 98);
+    ctx.fillStyle = C.kindei;
+    ctx.font = "600 14px 'Shippori Mincho B1',serif";
+    ctx.fillText("交代", cx, cy + 98);
     ctx.restore();
   }
 
@@ -455,35 +470,83 @@
     }
   }
 
+  // 天候の粒（雨は斜めの筋、追い風は横に流れる線と花びら）
+  function drawWeatherFx(s, dt) {
+    var w = WEATHER[s.weather];
+    if (w.id === "tsukiyo") return;
+    var t = performance.now() / 1000;
+    ctx.save();
+    if (w.id === "ame") {
+      ctx.strokeStyle = "rgba(95,180,217,.28)"; ctx.lineWidth = 1.1;
+      for (var i = 0; i < 46; i++) {
+        var x = (i * 113 + (t * 620) % 97) % (W + 60) - 30;
+        var y = (i * 71 + t * 900) % (H + 80) - 40;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 7, y + 22); ctx.stroke();
+      }
+    } else {
+      ctx.strokeStyle = "rgba(240,206,126,.20)"; ctx.lineWidth = 1.2;
+      for (var j = 0; j < 16; j++) {
+        var wy = (j * 47 + Math.sin(t * 0.7 + j) * 12) % H;
+        var wx = ((t * 420 + j * 137) % (W + 220)) - 110;
+        ctx.beginPath(); ctx.moveTo(wx, wy); ctx.lineTo(wx + 46, wy - 4); ctx.stroke();
+      }
+      ctx.fillStyle = "rgba(142,107,158,.35)";
+      for (var k = 0; k < 10; k++) {
+        var px2 = ((t * 260 + k * 211) % (W + 80)) - 40;
+        var py2 = (k * 83 + Math.sin(t * 1.3 + k) * 26) % H;
+        ctx.beginPath(); ctx.ellipse(px2, py2, 3.2, 2, t + k, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+
   function drawPlat(p, camX) {
     var x = platX(p) - camX, y = GROUND_Y;
-    var w = p.w, h = 20;
+    var w = p.w, h = 38;
     ctx.save();
-    // 宙に浮く式札。下に淡い金の残光を落として「浮いている」ことを見せる
+
+    // 宙に浮く足場。下に淡い金の残光を落として「浮いている」ことを見せる
     var glow = ctx.createRadialGradient(x, y + h, 2, x, y + h, w * 0.9);
-    glow.addColorStop(0, "rgba(240,206,126,.16)"); glow.addColorStop(1, "rgba(240,206,126,0)");
+    glow.addColorStop(0, "rgba(240,206,126,.14)"); glow.addColorStop(1, "rgba(240,206,126,0)");
     ctx.fillStyle = glow;
-    ctx.beginPath(); ctx.ellipse(x, y + h + 6, w * 0.9, 16, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(x, y + h + 8, w * 0.9, 16, 0, 0, Math.PI * 2); ctx.fill();
 
-    // 札の面（上面がわずかに広い短冊）
-    ctx.beginPath();
-    ctx.moveTo(x - w / 2, y); ctx.lineTo(x + w / 2, y);
-    ctx.lineTo(x + w / 2 - 5, y + h); ctx.lineTo(x - w / 2 + 5, y + h); ctx.closePath();
-    var g = ctx.createLinearGradient(0, y, 0, y + h);
-    g.addColorStop(0, "#2A2A44"); g.addColorStop(1, "#14141F");
-    ctx.fillStyle = g; ctx.fill();
-    ctx.strokeStyle = "rgba(240,206,126,.62)"; ctx.lineWidth = 1.3; ctx.stroke();
+    // 石垣を切り出した足場（上面＋積んだ石。忍者の里の石垣の意匠）
+    var L = x - w / 2, R = x + w / 2;
+    // 上面（苔むした石の面）
+    var top = ctx.createLinearGradient(0, y - 4, 0, y + 9);
+    top.addColorStop(0, "#6E6E86"); top.addColorStop(1, "#4A4A62");
+    ctx.fillStyle = top;
+    ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(R, y); ctx.lineTo(R - 3, y + 9); ctx.lineTo(L + 3, y + 9); ctx.closePath(); ctx.fill();
 
-    // 呪の線（札の意匠。幅に応じて本数を変える）
-    ctx.strokeStyle = "rgba(240,206,126,.22)"; ctx.lineWidth = 1;
-    var n = Math.max(2, Math.round(w / 26));
-    for (var i = 1; i < n; i++) {
-      var lx = x - w / 2 + (w / n) * i;
-      ctx.beginPath(); ctx.moveTo(lx, y + 4); ctx.lineTo(lx - 2, y + h - 4); ctx.stroke();
+    // 石の段（2段。1段目と2段目で継ぎ目をずらす＝布積み）
+    var rows = [{ y0: y + 9, y1: y + 24, inset: 3, shift: 0 }, { y0: y + 24, y1: y + h, inset: 8, shift: 0.5 }];
+    for (var r = 0; r < rows.length; r++) {
+      var ro = rows[r];
+      var n = Math.max(2, Math.round(w / 30));
+      var bw = (w - ro.inset * 2) / n;
+      for (var i = 0; i < n; i++) {
+        var bx = L + ro.inset + bw * i + (ro.shift ? bw * ro.shift : 0);
+        if (bx + bw > R - ro.inset + 1) continue;
+        var g = ctx.createLinearGradient(0, ro.y0, 0, ro.y1);
+        // 石は月明かりを受ける面なので、地の宵闇よりはっきり明るくする（暗いと意匠が読めない）
+        var tone = 52 + ((i * 9 + r * 17) % 18);
+        g.addColorStop(0, "rgb(" + (tone + 26) + "," + (tone + 25) + "," + (tone + 40) + ")");
+        g.addColorStop(1, "rgb(" + (tone - 12) + "," + (tone - 12) + "," + (tone + 2) + ")");
+        ctx.fillStyle = g;
+        ctx.fillStyle = g;
+        ctx.fillRect(bx + 1.2, ro.y0 + 1.2, bw - 2.4, ro.y1 - ro.y0 - 2.4);
+        // 石の上端に月明かりの反射
+        ctx.strokeStyle = "rgba(232,228,216,.22)"; ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(bx + 1.6, ro.y0 + 1.4); ctx.lineTo(bx + bw - 2.4, ro.y0 + 1.4); ctx.stroke();
+      }
     }
-    // 中央の印（会心の目安）
+
+    // 縁の金（式札の名残・会心の目安になる中央の印）
+    ctx.strokeStyle = "rgba(240,206,126,.5)"; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(R, y); ctx.stroke();
     ctx.strokeStyle = "rgba(240,206,126,.85)"; ctx.lineWidth = 1.6;
-    ctx.beginPath(); ctx.moveTo(x, y - 3); ctx.lineTo(x, y + h + 1); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, y - 5); ctx.lineTo(x, y + 8); ctx.stroke();
     ctx.restore();
   }
 
@@ -513,31 +576,61 @@
     ctx.translate(x, GROUND_Y - 6);
     ctx.strokeStyle = "rgba(240,206,126,.25)"; ctx.lineWidth = 4;
     ctx.beginPath(); ctx.arc(0, 0, 21, 0, Math.PI * 2); ctx.stroke();
-    ctx.strokeStyle = C.moon; ctx.lineWidth = 4; ctx.lineCap = "round";
+    ctx.strokeStyle = WEATHER[s.weather].color; ctx.lineWidth = 4; ctx.lineCap = "round";
     ctx.beginPath(); ctx.arc(0, 0, 21, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * held); ctx.stroke();
     ctx.restore();
   }
 
   function drawHud(s) {
+    var w = WEATHER[s.weather];
     ctx.save();
+
+    // 上部の帯（天候をここで見せる。地の絵と文字がぶつからないよう薄く敷く）
+    var band = ctx.createLinearGradient(0, 0, 0, 108);
+    band.addColorStop(0, "rgba(12,12,22,.72)"); band.addColorStop(1, "rgba(12,12,22,0)");
+    ctx.fillStyle = band; ctx.fillRect(0, 0, W, 108);
+
     ctx.textAlign = "left";
-    ctx.fillStyle = C.ink; ctx.font = "700 30px 'Shippori Mincho B1',serif";
-    ctx.fillText(s.step + "段", 22, 56);
+    ctx.fillStyle = C.ink; ctx.font = "700 32px 'Shippori Mincho B1',serif";
+    ctx.fillText(s.step + "段", 22, 54);
     ctx.font = "600 15px 'Shippori Mincho B1',serif"; ctx.fillStyle = C.inkDim;
-    ctx.fillText("最高 " + best + "段", 22, 80);
-    if (s.combo >= 2) {
-      ctx.textAlign = "right";
-      ctx.fillStyle = C.moon; ctx.font = "700 22px 'Shippori Mincho B1',serif";
-      ctx.fillText("会心 " + s.combo + "連", W - 22, 56);
-    }
-    // いま跳ぶ御霊の名前と癖（数値だけの差は体感できないため、画面に出す）
-    var id = currentChar(), hv = isHeavy(id);
+    ctx.fillText("最高 " + best + "段", 22, 78);
+
+    // 天候（名前・効き・目安のバー）
     ctx.textAlign = "right";
+    ctx.fillStyle = w.color; ctx.font = "700 24px 'Shippori Mincho B1',serif";
+    ctx.fillText(w.name, W - 22, 50);
     ctx.fillStyle = C.inkDim; ctx.font = "600 14px 'Shippori Mincho B1',serif";
-    ctx.fillText(NAMES[id] || id, W - 22, s.combo >= 2 ? 80 : 56);
-    ctx.fillStyle = hv ? C.anshi : C.kindei;
-    ctx.font = "700 14px 'Shippori Mincho B1',serif";
-    ctx.fillText(hv ? "重" : "軽", W - 22, s.combo >= 2 ? 102 : 78);
+    ctx.fillText(w.note, W - 22, 72);
+    // 距離の伸び縮みを目盛りで示す（真ん中が基準）
+    var bx = W - 118, by = 84, bw2 = 96;
+    ctx.strokeStyle = "rgba(232,228,216,.22)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(bx + bw2, by); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(bx + bw2 / 2, by - 4); ctx.lineTo(bx + bw2 / 2, by + 4); ctx.stroke();
+    var mark = bx + bw2 / 2 + (w.mul - 1) * bw2 * 2.2;
+    ctx.fillStyle = w.color;
+    ctx.beginPath(); ctx.arc(Math.max(bx, Math.min(mark, bx + bw2)), by, 4, 0, Math.PI * 2); ctx.fill();
+
+    if (s.combo >= 2) {
+      ctx.textAlign = "center";
+      ctx.fillStyle = C.moon; ctx.font = "700 20px 'Shippori Mincho B1',serif";
+      ctx.fillText("会心 " + s.combo + "連", W / 2, 50);
+    }
+    ctx.restore();
+  }
+
+  // 天候が変わった瞬間だけ、画面中央に短く出す（遊びは止めない）
+  function drawWeatherSwap(s, dt) {
+    if (s.wxT <= 0) return;
+    s.wxT = Math.max(0, s.wxT - dt * 0.9);
+    var w = WEATHER[s.weather];
+    ctx.save();
+    ctx.globalAlpha = Math.min(s.wxT * 2.2, 1) * 0.95;
+    ctx.textAlign = "center";
+    ctx.fillStyle = w.color; ctx.font = "800 40px 'Shippori Mincho B1',serif";
+    ctx.fillText(w.name, W / 2, 246);
+    ctx.fillStyle = C.ink; ctx.font = "600 17px 'Shippori Mincho B1',serif";
+    ctx.fillText(w.note, W / 2, 276);
     ctx.restore();
   }
 
@@ -549,7 +642,7 @@
     ctx.textAlign = "center";
     ctx.fillStyle = s.flashColor;
     ctx.font = "800 34px 'Shippori Mincho B1',serif";
-    ctx.fillText(s.flashText, W / 2, 356 - (1 - s.flash) * 26);
+    ctx.fillText(s.flashText, W / 2, 302 - (1 - s.flash) * 26);
     ctx.restore();
   }
 
@@ -597,11 +690,9 @@
     if (s.phase !== "play" || s.jump) return;
     if (!s.charging) { s.charging = true; s.chargeStart = performance.now(); return; }
     var cur = s.plats[0], next = s.plats[1];
-    var want = platX(next) - platX(cur);
+    var want = platX(next) - s.charX;
     if (DBG.automiss) want *= 1.6;                       // わざと跳びすぎる
-    var heavy = isHeavy(currentChar());
-    var want01 = Math.max(0, Math.min((want - 72) / 300, 1));
-    var t = heavy ? Math.pow(want01, 1 / 1.45) : want01;
+    var t = Math.max(0, Math.min((want / WEATHER[s.weather].mul - 72) / 300, 1));
     var held = Math.max(0.16, Math.min(t, 1.0));
     if ((performance.now() - s.chargeStart) / 1000 >= held) release();
   }
@@ -614,16 +705,17 @@
 
     if (DBG.autoperfect || DBG.automiss) autoTick(s);
 
-    // カメラは足元の台座が STAND_X に来るように追う。
-    // 跳んでいる間は着地先へ寄せておく（着地した瞬間に次の札が見えていないと狙えないため）
-    var anchor = s.jump ? platX(s.jump.next) : platX(s.plats[0]);
-    var targetCam = anchor - STAND_X;
-    s.camX += (targetCam - s.camX) * Math.min(dt * (s.jump ? 6 : 15), 1);
+    // カメラは「キャラが STAND_X に来る位置」を目指すが、**跳んでいる間は動かさない**。
+    // 弧とカメラの移動が混ざると、右へ跳んでいるのに一度左へ流れて見える（2026-08-25 指摘）。
+    if (!s.jump) {
+      var targetCam = s.charX - STAND_X;
+      s.camX += (targetCam - s.camX) * Math.min(dt * 14, 1);
+    }
 
     drawBg(s);
     for (var i = 0; i < s.plats.length; i++) drawPlat(s.plats[i], s.camX);
 
-    var px = platX(s.plats[0]) - s.camX, py = GROUND_Y;
+    var px = s.charX - s.camX, py = GROUND_Y;
     if (s.jump) {
       s.jump.t += dt;
       var k = Math.min(s.jump.t / s.jump.dur, 1);
@@ -639,8 +731,10 @@
     }
 
     drawRipples(dt, s.camX);
+    if (s.phase === "play") drawWeatherFx(s, dt);
     if (s.phase === "play") drawHud(s);
     drawSwap(dt);
+    if (s.phase === "play") drawWeatherSwap(s, dt);
     drawFlash(s, dt);
     if (s.phase === "title") drawTitle();
     if (s.phase === "result") drawResult(s);

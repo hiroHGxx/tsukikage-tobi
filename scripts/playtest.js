@@ -60,6 +60,8 @@ async function run(base, hash, until, timeout, shot) {
   const routes = [
     { name: "自動プレイで満月（50段）まで", hash: "#autoperfect",
       until: "window.__tsukikage.state.step >= 50", timeout: 180000, shot: "/tmp/tsukikage-moon.png" },
+    { name: "中盤の見た目（17段・天候あり）", hash: "#autoperfect",
+      until: "window.__tsukikage.state.step >= 17", timeout: 90000, shot: "/tmp/tsukikage-mid.png" },
     { name: "わざと外して夜明け（結果画面）", hash: "#automiss",
       until: "window.__tsukikage.state.phase === 'result'", timeout: 30000, shot: "/tmp/tsukikage-over.png" },
   ];
