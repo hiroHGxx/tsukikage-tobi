@@ -100,6 +100,7 @@
   var bgFar = new Image(), bgNear = new Image();
   bgFar.src = (window.BG_DATA && window.BG_DATA.far) || "assets/art/bg-far.webp";
   bgNear.src = (window.BG_DATA && window.BG_DATA.near) || "assets/art/bg-near.webp";
+  var titleArt = (window.BG_DATA && window.BG_DATA.title) || "assets/art/title.webp";
   function ready(im) { return im.complete && im.naturalWidth > 0; }
   // 背景を横に敷き詰める。1枚おきに左右反転させる（鏡張り）ので、
   // 元画像の左右端が完全に一致していなくても継ぎ目が出ない。
@@ -627,16 +628,9 @@
     if (now < lockUntil) return;
     audioCtx();
     var s = state;
+    if (s.phase === "title") return;   // タイトルはDOMの札が受ける
     if (s.phase === "play" && hitTestBar(lastPointer.x, lastPointer.y)) return;   // 試しのボタン
     // reset() は state を作り直すので、phase は必ず新しい state 側に立てる（古い s に書くと始まらない）
-    if (s.phase === "title") {
-      // 題字の上を1.5秒以内に3回タップしたときだけ試しモードを出入りする。
-      // 画面全体を対象にすると、1回目のタップでゲームが始まってしまう（既存2作もロゴ限定）
-      var onTitle = Math.abs(lastPointer.x - W / 2) < 130 &&
-                    lastPointer.y > 232 && lastPointer.y < 292;
-      if (onTitle) { tryEnterTest(now); return; }
-      reset(); state.phase = "play"; startBGM(); voice("start"); return;
-    }
     if (s.phase === "result") { reset(); state.phase = "play"; return; }
     if (s.phase === "play" && !s.jump) { s.charging = true; s.chargeStart = now; }
   }
@@ -1109,7 +1103,8 @@
 
   // ---- 自動プレイ（検証用）----
   function autoTick(s) {
-    if (s.phase === "title" || s.phase === "result") {
+    if (s.phase === "title") { begin(false, true); return; }   // 検証時はタイトルを自分で開ける
+    if (s.phase === "result") {
       if (performance.now() >= lockUntil) down({ preventDefault: function () { }, cancelable: false });
       return;
     }
@@ -1180,7 +1175,6 @@
     if (s.phase === "play") drawWeatherSwap(s, dt);
     drawFlash(s, dt);
     drawTestBar(s);
-    if (s.phase === "title") drawTitle();
     if (s.phase === "result") drawResult(s);
 
     // 撮影用に浮き文字を消す
@@ -1189,12 +1183,77 @@
     requestAnimationFrame(frame);
   }
 
+  // ---- タイトルと帳（式札かさねと同じ構え）----
+  // タイトルはDOMの札（#title-overlay）。開始を押すと帳（#door）が閉じた状態で現れ、
+  // 栞のひと言のあとに左右へ開く。開ききるまで入力は受けない。
+  var overlay = document.getElementById("title-overlay");
+  var doorEl = document.getElementById("door");
+  var started = false;
+
+  function showTitle() {
+    var bg = document.getElementById("title-bg");
+    var im = new Image();
+    im.onload = function () {
+      bg.style.backgroundImage = "url(" + titleArt + ")";
+      overlay.classList.add("art-in");
+      setTimeout(function () { overlay.classList.add("ready"); }, 420);
+    };
+    im.onerror = function () { overlay.classList.add("ready"); };
+    im.src = titleArt;
+
+    if (best > 0) {
+      var el = document.getElementById("best-title");
+      el.hidden = false;
+      el.innerHTML = "これまでの誉れ：<em>" + best + "段　" + titleFor(best) + "</em>";
+    }
+  }
+
+  function begin(withSound, skipDoor) {
+    if (started) return;
+    started = true;
+    muted = !withSound;
+    overlay.classList.add("hidden");
+
+    reset();
+    state.phase = "play";
+    if (withSound) { audioCtx(); startBGM(); }
+
+    // 帳が開く: 閉じた扉を見せ、栞のひと言のあとに左右へ開く
+    if (skipDoor) { lockUntil = performance.now() + 300; return; }   // 検証用（自動プレイ）
+    doorEl.classList.remove("open");
+    doorEl.classList.add("show");
+    lockUntil = performance.now() + 2600;      // 開ききるまで跳べない
+    setTimeout(function () { voice("start"); }, 350);
+    setTimeout(function () { doorEl.classList.add("open"); }, 1100);
+    setTimeout(function () { doorEl.classList.remove("show"); }, 2700);
+  }
+  document.getElementById("start").addEventListener("click", function () { begin(true); });
+  document.getElementById("start-silent").addEventListener("click", function () { begin(false); });
+
+  // 試しモード: 題字を1.5秒以内に3回タップ（既存2作と同じ操作）。
+  // click ではなく pointerdown で数える（iOSのダブルタップ抑止が2回目以降のclickを消すため）
+  document.querySelector(".game-title").addEventListener("pointerdown", function () {
+    var now = performance.now();
+    titleTaps = titleTaps.filter(function (t) { return now - t < 1500; });
+    titleTaps.push(now);
+    if (titleTaps.length >= 3) {
+      titleTaps = [];
+      testMode = !testMode;
+      var el = document.getElementById("best-title");
+      el.hidden = false;
+      el.innerHTML = testMode ? "<em>試し（記録は残りません）</em>"
+        : (best > 0 ? "これまでの誉れ：<em>" + best + "段　" + titleFor(best) + "</em>" : "");
+      if (!testMode && best <= 0) el.hidden = true;
+    }
+  });
+
   // ---- 起動 ----
   resize();
   reset();
-  state.phase = "title";
+  state.phase = "title";     // 実際の見た目はDOMのタイトル札（#title-overlay）が担う
   loadSE();
   loadVoice();
+  showTitle();
   requestAnimationFrame(frame);
 
   // 検証用に外へ出す

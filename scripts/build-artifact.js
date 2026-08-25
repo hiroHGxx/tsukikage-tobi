@@ -21,6 +21,7 @@ const bgm = b64("assets/audio/bgm.m4a");
 const bg = {
   far: "data:image/webp;base64," + b64("assets/art/bg-far.webp"),
   near: "data:image/webp;base64," + b64("assets/art/bg-near.webp"),
+  title: "data:image/webp;base64," + b64("assets/art/title.webp"),
 };
 
 // ボイス（あれば埋め込む。無ければ空のまま＝鳴らないだけ）
@@ -33,6 +34,8 @@ for (const k of ["start", "r0", "r1", "r2", "r3", "r4"]) {
 // page.html から <style> と本文だけを取り出す（head/body は公開時に付く）
 const page = read("src/page.html");
 const style = page.match(/<style>([\s\S]*?)<\/style>/)[1];
+// <body> の中身（タイトル札・帳・canvas）をそのまま持ってくる。script タグは除く
+const body = page.match(/<body>([\s\S]*?)<script/)[1].trim();
 
 const html = `<title>月影とび</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -43,8 +46,7 @@ const html = `<title>月影とび</title>
 html,body{height:100%;background:#131320;}
 ${style}
 </style>
-<div id="stage"><canvas id="cv"></canvas></div>
-<p class="sr">長押しで力を溜め、離して跳びます。式札の飛び石に着地し、何段先まで届くかを競うゲームです。</p>
+${body}
 <script>
 window.AUDIO_DATA = ${JSON.stringify(audio)};
 window.BGM_DATA = ${JSON.stringify(bgm)};
