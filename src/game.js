@@ -1197,6 +1197,9 @@
       return;
     }
     if (s.phase !== "play" || s.jump) return;
+    // 実プレイと同じで、入力止め（帳・満月成就の儀）の間は溜め始めない。
+    // ここを素通りさせると、儀の最中に自動プレイだけが跳び続けて、検証が実物とずれる。
+    if (performance.now() < lockUntil) return;
     if (!s.charging) { s.charging = true; s.chargeStart = performance.now(); return; }
     var cur = s.plats[0], next = s.plats[1];
     var want = platX(next) - s.charX;
