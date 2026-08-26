@@ -137,7 +137,7 @@
   // 鳴らす効果音の一覧。**ここが正本**で、読み込みも Artifact 版の埋め込み
   // （scripts/build-artifact.js）も、この配列を見る。手で二重管理しない
   // （リストのずれで Artifact だけ無音になった 2026-08-26 の事故の再発防止）。
-  var SE_NAMES = ["zan", "kirari", "kiwami", "fukaku", "whiff", "end"];
+  var SE_NAMES = ["zan", "combo", "kiwami", "fukaku", "whiff", "end"];
   var actx = null, seBuf = {}, bgmEl = null, muted = false;
   // 効果音は専用バス（sfxBus）に集めて、台詞の間だけまとめて沈める。
   // 式札かさねで「SEが声とほぼ同じ大きさで並んでいた」取りこぼしがあったので、
@@ -434,7 +434,7 @@
 
     if (skipped > 0) {                    // 台座を飛び越した
       flash(skipped === 1 ? "一つ飛ばし" : skipped + "つ飛ばし", C.shokko);
-      se("kirari", 0.85);
+      se("combo", 0.85);
       s.combo += skipped;                 // 思い切りの分だけ連が伸びる
       s.maxCombo = Math.max(s.maxCombo, s.combo);
     }
@@ -444,10 +444,10 @@
       s.combo++;
       s.maxCombo = Math.max(s.maxCombo, s.combo);
       flash("会心", C.moon);
-      // 会心は「キラリン」＝高くて短い一発（2026-08-26 オーナー裁定）。
-      // 以前は琴（200Hz・鳴り1.2秒）で、跳ぶ音（8.5kHzで0.14秒）より低くて長く、
-      // 高低が逆転して報酬に聞こえなかった。連による音階の変化もやめて一種に統一。
-      se("kirari", 0.9);
+      // 会心は公式音源の combo（2776Hz・単音・0.44秒）。以前は琴（200Hz・鳴り1.2秒）で、
+      // 跳ぶ音（8.5kHz・0.14秒）より低くて長く、高低が逆転して報酬に聞こえなかった。
+      // 連による音階の変化もやめて一種に統一（2026-08-26 オーナー裁定）。
+      se("combo", 0.9);
     } else {
       s.combo = 0;      // 通常の着地は無音（音を足しすぎない）
     }
