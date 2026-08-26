@@ -2,3 +2,4 @@ assets/chars/
 node_modules/
 .DS_Store
 dist/
+.tmp_ogp/
