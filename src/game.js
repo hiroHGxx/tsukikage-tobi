@@ -232,8 +232,8 @@
   }
   // 到達段数から、結果で読む台詞を選ぶ
   function resultVoiceKey(step) {
-    if (step > 50) return "r5";      // 満月のさらに先で落ちた
-    if (step >= 50) return "r4";
+    // 50段以上はどちらも r5。r4 は満月成就の儀（moonRite）で鳴らすので、ここでは使わない
+    if (step >= 50) return "r5";
     if (step >= 38) return "r3";
     if (step >= 22) return "r2";
     if (step >= 10) return "r1";
@@ -510,6 +510,11 @@
     lockUntil = performance.now() + 1900;
     se("kiwami", 1.0);
     setTimeout(function () { se("fukaku", 0.7); }, 620);
+    // 満月に届いた瞬間に栞が言祝ぐ（2026-08-26 オーナー指摘で追加）。
+    // r4 はもともと「ちょうど50段で終えた回のリザルト」用だったが、50段に届いた人は
+    // 普通そのまま続けるので、実際にはほとんど誰にも聞かれない台詞だった。
+    // 一番の見せ場に置き直す。鐘（kiwami）の一撃を先に聴かせてから重ねる。
+    setTimeout(function () { voice("r4"); }, 500);
   }
   function drawRite(dt) {
     if (rite.t <= 0) return;
