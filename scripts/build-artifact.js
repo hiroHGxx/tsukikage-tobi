@@ -13,22 +13,28 @@ const root = path.join(__dirname, "..");
 const read = (p) => fs.readFileSync(path.join(root, p), "utf8");
 const b64 = (p) => fs.readFileSync(path.join(root, p)).toString("base64");
 
-// 埋め込む音は **src/game.js から機械的に拾う**。
+// 埋め込む音は **src/game.js の SE_NAMES / VOICE_KEYS から機械的に読む**。
 // 手で並べていたときに koto / koto_high（会心）と r5（51段以上の声）が抜け、
 // Artifact版だけ無音になっていた（2026-08-26 レビュー指摘）。
 // AUDIO_DATA に無いキーは fetch へ落ちるが、Artifact の CSP で全滅するため気づきにくい。
 const gameSrc = read("src/game.js");
-// se(...) の呼び出しごと拾って、その中の文字列を全部取る
-// （se(s.combo >= 3 ? "koto_high" : "koto", 0.9) のような三項も取りこぼさない）
-const SE = [...new Set(
+const arr = (name) => {
+  const m = gameSrc.match(new RegExp(name + "\\s*=\\s*\\[([^\\]]*)\\]"));
+  if (!m) throw new Error(`src/game.js から ${name} を読めませんでした`);
+  return (m[1].match(/"([a-z0-9_]+)"/g) || []).map((q) => q.slice(1, -1));
+};
+const SE = arr("SE_NAMES");
+const VOICE_KEYS = arr("VOICE_KEYS");
+
+// se("x") で鳴らしているのに SE_NAMES に無い音は、そもそも読み込まれず無音になる。
+// 三項（se(cond ? "a" : "b", v)）も拾えるよう、呼び出し全体から文字列を取る。
+const called = new Set(
   [...gameSrc.matchAll(/\bse\(([^)]*)\)/g)]
     .flatMap((m) => m[1].match(/"([a-z0-9_]+)"/g) || [])
     .map((q) => q.slice(1, -1))
-)].sort();
-const VK = (gameSrc.match(/VOICE_KEYS\s*=\s*\[([^\]]*)\]/) || [, ""])[1]
-  .match(/"([a-z0-9_]+)"/g) || [];
-const VOICE_KEYS = VK.map((q) => q.slice(1, -1));
-if (!SE.length || !VOICE_KEYS.length) throw new Error("src/game.js から音のキーを拾えませんでした");
+);
+const notLoaded = [...called].filter((n) => !SE.includes(n));
+if (notLoaded.length) throw new Error(`se() で鳴らしているのに SE_NAMES に無い音: ${notLoaded.join(", ")}`);
 
 const audio = {};
 for (const n of SE) {

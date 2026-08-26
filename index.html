@@ -5,11 +5,13 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="theme-color" content="#131320">
 <title>月影とび｜月蝕綺譚 二次創作</title>
-<meta name="description" content="長押しで力を溜めて離す。宵闇に浮かぶ式札の飛び石を渡り、何段先まで届くかを競う。『月蝕綺譚 -Luna Occulta-』の二次創作ファンゲーム。">
+<meta name="description" content="長押しで力を溜めて離す。宵闇に浮かぶ石の飛び石を渡り、何段先まで届くかを競う。『月蝕綺譚 -Luna Occulta-』の二次創作ファンゲーム。">
 <meta property="og:title" content="月影とび">
-<meta property="og:description" content="力を溜めて、離して跳ぶ。式札の道を、月まで。">
+<meta property="og:description" content="力を溜めて、離して跳ぶ。石の道を、月まで。">
 <meta property="og:type" content="website">
-<meta property="og:image" content="ogp.png">
+<meta property="og:image" content="https://hirohgxx.github.io/tsukikage-tobi/ogp.png">
+<meta property="og:url" content="https://hirohgxx.github.io/tsukikage-tobi/">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect width=%2232%22 height=%2232%22 fill=%22%23131320%22/%3E%3Ccircle cx=%2216%22 cy=%2213%22 r=%228%22 fill=%22%23F0CE7E%22/%3E%3Crect x=%228%22 y=%2224%22 width=%2216%22 height=%223%22 rx=%221%22 fill=%22%23D9A94C%22/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -123,7 +125,7 @@
 </head>
 <body>
 <div id="stage"><canvas id="cv"></canvas></div>
-<p class="sr">長押しで力を溜め、離して跳びます。石垣の飛び石に着地し、何段先まで届くかを競うゲームです。</p>
+<p class="sr">長押しで力を溜め、離して跳びます。石の飛び石に着地し、何段先まで届くかを競うゲームです。</p>
 
 <div id="title-overlay">
   <div id="title-bg"></div>
@@ -134,7 +136,7 @@
     <div class="story">月へ続く道は、夜ごと架け替えられる。<br>呼ばれた御霊が宙の石をひとつ、<br>またひとつ跳んで渡る。</div>
     <ul class="howto">
       <li>画面を長押しして力を溜め、離して跳ぶ</li>
-      <li>溜めが長いほど遠くへ。石垣を外せば夜明け</li>
+      <li>溜めが長いほど遠くへ。石を外せば夜明け</li>
       <li>金の帯に乗れば会心——連ねるほど誉れになる</li>
       <li>五十段の高みで、満月に逢える</li>
     </ul>
@@ -276,8 +278,6 @@ const ICON = {
   // ---- 御霊の並び（chars.js のキー順＝素材蔵の台帳順）----
   // 「あるじどの」は御霊ではなく主人公（御霊を式札に宿す側）なので、跳ぶ御霊の巡回には入れない
   var IDS = Object.keys(CHIBI).filter(function (id) { return id !== "arujidono"; });
-  // 風魔勢は鎧・鬼系＝「重い」。見た目がそのまま説明になるので注記は出さない。
-  var HEAVY = { atoza: 1, aun: 1, dan: 1, janome: 1, karma: 1, kohaku: 1, orochi: 1, rotton: 1 };
   var NAMES = {
     anne: "餡音", arujidono: "あるじどの", atoza: "アトザ", aun: "アウン", benten: "弁天",
     dan: "断", emma: "エマ", hinanojo: "雛之丞", izuna: "イズナ", janome: "蛇ノ目",
@@ -393,10 +393,24 @@ const ICON = {
   });
 
   // ---- 音（Pages版は別ファイル、Artifact版は AUDIO_DATA に差し替わる）----
-  var SE_NAMES = ["zan", "kiwami", "fukaku", "whiff", "end", "koto", "koto_high"];
+  // 鳴らす効果音の一覧。**ここが正本**で、読み込みも Artifact 版の埋め込み
+  // （scripts/build-artifact.js）も、この配列を見る。手で二重管理しない
+  // （リストのずれで Artifact だけ無音になった 2026-08-26 の事故の再発防止）。
+  var SE_NAMES = ["zan", "kirari", "kiwami", "fukaku", "whiff", "end"];
   var actx = null, seBuf = {}, bgmEl = null, muted = false;
+  // 効果音は専用バス（sfxBus）に集めて、台詞の間だけまとめて沈める。
+  // 式札かさねで「SEが声とほぼ同じ大きさで並んでいた」取りこぼしがあったので、
+  // その sfxBus 方式をこちらにも持ってきた（docs/MEDIA.md「ダッキング」）。
+  var SFX_BUS = 0.9, SFX_DUCK = 0.45, sfxBus = null;   // 台詞中は約 -7dB
   function audioCtx() {
-    if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { } }
+    if (!actx) {
+      try {
+        actx = new (window.AudioContext || window.webkitAudioContext)();
+        // 効果音バスは**ここで先に作る**。最初の効果音が鳴るまで作らない書き方だと、
+        // 開始の台詞（帳と同時に鳴る）のダッキングが空振りする。
+        sfxBus = actx.createGain(); sfxBus.gain.value = SFX_BUS; sfxBus.connect(actx.destination);
+      } catch (e) { }
+    }
     if (actx && actx.state === "suspended") actx.resume();
     return actx;
   }
@@ -424,7 +438,7 @@ const ICON = {
     try {
       var s = a.createBufferSource(); s.buffer = seBuf[name];
       var g = a.createGain(); g.gain.value = (vol === undefined ? 0.9 : vol);
-      s.connect(g); g.connect(a.destination); s.start(0);
+      s.connect(g); g.connect(sfxBus || a.destination); s.start(0);
     } catch (e) { }
   }
   // ---- ボイス（栞・公式指定のElevenLabs Voice ID で制作）----
@@ -450,12 +464,30 @@ const ICON = {
       var g = a.createGain(); g.gain.value = 1.0;      // 声 > SE > BGM（MEDIA.md）
       src.connect(g); g.connect(a.destination); src.start(0);
       voicePlaying = src;
-      if (bgmGain) {                                   // 声の間はBGMを下げる
-        bgmGain.gain.value = 0.07;
-        setTimeout(function () { if (bgmGain && !document.hidden) bgmGain.gain.value = 0.16; },
-                   Math.min(src.buffer.duration * 1000 + 250, 8000));
-      }
+      duck(a, src.buffer.duration);
     } catch (e) { }
+  }
+  // 台詞が鳴っている間だけ BGM と効果音を沈める。
+  // **BGMの経路は2本ある**: Artifact版は WebAudio（bgmGain）、Pages版は HTMLAudio（bgmEl）。
+  // 以前は bgmGain しか下げておらず、主配信の Pages 版でダッキングが効いていなかった
+  // （2026-08-26 レビュー指摘）。
+  var duckTimer = null, duckUntil = 0;
+  function bgmVol(v) {
+    if (bgmEl) { try { bgmEl.volume = v; } catch (e) { } return; }
+    if (bgmGain) { try { bgmGain.gain.value = v; } catch (e) { } }
+  }
+  function duck(a, sec) {
+    var ms = Math.min(sec * 1000 + 250, 9000);
+    duckUntil = Math.max(duckUntil, performance.now() + ms);   // 台詞が重なったら長い方に合わせる
+    bgmVol(0.07);
+    if (sfxBus) { try { sfxBus.gain.setTargetAtTime(SFX_BUS * SFX_DUCK, a.currentTime, 0.05); } catch (e) { } }
+    if (duckTimer) clearTimeout(duckTimer);
+    duckTimer = setTimeout(function () {
+      duckTimer = null;
+      if (document.hidden) return;
+      bgmVol(0.16);
+      if (sfxBus) { try { sfxBus.gain.setTargetAtTime(SFX_BUS, audioCtx().currentTime, 0.12); } catch (e) { } }
+    }, Math.max(0, duckUntil - performance.now()));
   }
   // 到達段数から、結果で読む台詞を選ぶ
   function resultVoiceKey(step) {
@@ -496,10 +528,10 @@ const ICON = {
     // バックグラウンドでは止めて、戻ったら鳴らし直す（電池と「裏で鳴り続ける」対策）
     if (bgmEl) { if (document.hidden) bgmEl.pause(); else bgmEl.play().catch(function () { }); return; }
     if (!bgmGain) return;
-    try { bgmGain.gain.value = document.hidden ? 0 : 0.16; } catch (e) { }
+    bgmVol(document.hidden ? 0 : (duckTimer ? 0.07 : 0.16));
   });
 
-  // ---- 台座（式札の飛び石）----
+  // ---- 台座（石の飛び石）----
   var GROUND_Y = 430;       // 台座の上面（画面の下1/3に沈まないよう上げた）
   var STAND_X = 110;        // 足元の固定位置（カメラはここに合わせて流れる）
   var state, lockUntil = 0;
@@ -594,7 +626,6 @@ const ICON = {
     var o = state.order || IDS;
     return o[state.charIdx % o.length];
   }
-  function isHeavy(id) { return !!HEAVY[id]; }
 
   // ---- 跳ぶ ----
   function release() {
@@ -607,8 +638,8 @@ const ICON = {
     if (held < 0.15) { s.shake = 0.35; se("whiff", 0.5); return; }
 
     var t = Math.min(held, 1.0);
-    // 重い御霊は「同じ溜めでは伸びない」（序盤〜中盤で2割ほど短い）が、最大射程は同じにする。
-    // 射程そのものを詰めると、終盤の間合いに届かなくなって詰むため（2026-08-25 修正）。
+    // 飛距離は溜めの長さ×天候の係数。御霊ごとの癖は入れない
+    // （体感できず詰みも生んだので、差は「場」＝天候で作ると裁定した 2026-08-25）。
     var dist = (72 + t * 300) * WEATHER[s.weather].mul;
     var cur = s.plats[0], next = s.plats[1];
     var landX = s.charX + dist;   // 台座の中央ではなく、いま立っている場所から跳ぶ
@@ -662,7 +693,7 @@ const ICON = {
 
     if (skipped > 0) {                    // 台座を飛び越した
       flash(skipped === 1 ? "一つ飛ばし" : skipped + "つ飛ばし", C.shokko);
-      se("koto_high", 0.85);
+      se("kirari", 0.85);
       s.combo += skipped;                 // 思い切りの分だけ連が伸びる
       s.maxCombo = Math.max(s.maxCombo, s.combo);
     }
@@ -672,8 +703,10 @@ const ICON = {
       s.combo++;
       s.maxCombo = Math.max(s.maxCombo, s.combo);
       flash("会心", C.moon);
-      // 会心は既存2作と同じ琴のワンショット。連が伸びたら高い方に変える
-      se(s.combo >= 3 ? "koto_high" : "koto", 0.9);
+      // 会心は「キラリン」＝高くて短い一発（2026-08-26 オーナー裁定）。
+      // 以前は琴（200Hz・鳴り1.2秒）で、跳ぶ音（8.5kHzで0.14秒）より低くて長く、
+      // 高低が逆転して報酬に聞こえなかった。連による音階の変化もやめて一種に統一。
+      se("kirari", 0.9);
     } else {
       s.combo = 0;      // 通常の着地は無音（音を足しすぎない）
     }
@@ -884,7 +917,7 @@ const ICON = {
     s.phase = "result";
     if (!s.test) {   // 試しモードの記録は残さない（BESTを汚さない）
       if (s.step > best) { best = s.step; save("tsukikage_best", String(best)); s.newBest = true; }
-      if (s.maxCombo > bestCombo) { bestCombo = s.maxCombo; save("tsukikage_best_combo", String(bestCombo)); }
+      if (s.maxCombo > bestCombo) { bestCombo = s.maxCombo; save("tsukikage_best_combo", String(bestCombo)); s.newBestCombo = true; }
     }
     se("end", 0.8);
     setTimeout(function () { voice(resultVoiceKey(s.step)); }, 420);
@@ -896,18 +929,8 @@ const ICON = {
   // 入り方: タイトル画面を1.5秒以内に3回タップ（既存2作の「稽古」と同じ流儀）。
   // 目的は「遊びながら各要素を確かめる」こと。**記録は一切保存しない**
   // （式札かさねで稽古モードがBESTを汚した件の再発防止）。
+  // 出入りの判定は DOM の題字（.game-title）側が数える（この下の入力節）。
   var testMode = false, titleTaps = [];
-  function tryEnterTest(now) {
-    titleTaps = titleTaps.filter(function (t) { return now - t < 1500; });
-    titleTaps.push(now);
-    if (titleTaps.length >= 3) {
-      titleTaps = [];
-      testMode = !testMode;
-      flash(testMode ? "試し" : "試し おわり", C.shokko);
-      return true;
-    }
-    return false;
-  }
 
   // 画面下のボタン列（テストモードのときだけ出す）
   function testButtons() {
@@ -1404,7 +1427,20 @@ const ICON = {
     ctx.save();
     ctx.fillStyle = "rgba(10,10,20,.74)"; ctx.fillRect(0, 0, W, H);
 
-    var cw = 320, ch = 300, cx0 = (W - cw) / 2, cy0 = 186;
+    var cw = 320, ch = 300, cx0 = (W - cw) / 2, cy0 = 196;
+    // 最後に跳んでいた御霊を、札の上縁に立たせる。
+    // 3作で唯一「絵が1枚も無いリザルト」だった（2026-08-26 レビュー指摘）。
+    // 記録更新の瞬間はスクショされる場所なので、誰が連れて行ったかを残す。
+    var rid = currentChar(), rim = imgs[rid];
+    if (rim && rim.complete && rim.naturalWidth) {
+      var rh = 104, rw = rh * (rim.naturalWidth / rim.naturalHeight);
+      ctx.save();
+      ctx.globalAlpha = 0.32; ctx.fillStyle = "#000";
+      ctx.beginPath(); ctx.ellipse(W / 2, cy0 + 1, rw * 0.34, 5, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.drawImage(rim, W / 2 - rw / 2, cy0 - rh + 2, rw, rh);
+      ctx.restore();
+    }
     panel(cx0, cy0, cw, ch, 12);
 
     // 見出し（2作と同じ: 通常は蝕紅、達成は金・字間.3em）
@@ -1428,16 +1464,23 @@ const ICON = {
     ctx.strokeStyle = "rgba(184,155,90,.22)";
     ctx.beginPath(); ctx.moveTo(cx0 + 36, cy0 + 196); ctx.lineTo(cx0 + cw - 36, cy0 + 196); ctx.stroke();
 
-    // 会心と最高（左右に並べる。2作の stats と同じ字間）
+    // 今回の会心連と、記録2種を3列で並べる。
+    // 腕前の2軸目（会心連続）は保存だけして表示していなかった（2026-08-26 レビュー指摘）。
+    // Discordに貼れる数字を段数の1軸に痩せさせない。
+    var col = [cx0 + 58, W / 2, cx0 + cw - 58];
     ctx.font = "500 9px " + MINCHO; ctx.fillStyle = C.inkDim;
-    textLS("かいしん", cx0 + 74, cy0 + 218, 2.2, "center");
-    textLS("さいこう", cx0 + cw - 74, cy0 + 218, 2.2, "center");
-    num(s.maxCombo + " 連", cx0 + 74, cy0 + 244, 20, C.ink, "center");
-    num(best + "段", cx0 + cw - 74, cy0 + 244, 20, C.ink, "center");
+    textLS("かいしん", col[0], cy0 + 218, 2.2, "center");
+    textLS("さいこうだん", col[1], cy0 + 218, 1.4, "center");
+    textLS("さいこうれん", col[2], cy0 + 218, 1.4, "center");
+    num(s.maxCombo + " 連", col[0], cy0 + 244, 19, s.newBestCombo ? C.moon : C.ink, "center");
+    num(best + "段", col[1], cy0 + 244, 19, C.ink, "center");
+    num(bestCombo + " 連", col[2], cy0 + 244, 19, C.ink, "center");
 
-    if (s.newBest) {
+    if (s.newBest || s.newBestCombo) {
       ctx.font = "700 12px " + MINCHO; ctx.fillStyle = C.kindei;
-      textLS("じこさいこうを こうしん", W / 2, cy0 + 276, 2.0, "center");
+      textLS(s.newBest && s.newBestCombo ? "だんも れんも こうしん"
+        : s.newBest ? "じこさいこうを こうしん" : "かいしんの れんを こうしん",
+        W / 2, cy0 + 276, 2.0, "center");
     } else if (s.test) {
       ctx.font = "700 12px " + MINCHO; ctx.fillStyle = C.shokko;
       textLS("試し（記録は残りません）", W / 2, cy0 + 276, 1.6, "center");
@@ -1575,8 +1618,15 @@ const ICON = {
     if (best > 0) {
       var el = document.getElementById("best-title");
       el.hidden = false;
-      el.innerHTML = "これまでの誉れ：<em>" + best + "段　" + titleFor(best) + "</em>";
+      el.innerHTML = bestLine();
     }
+  }
+  // タイトルの誉れ行。**段と会心連の2軸**を出す（連を保存だけして表示していなかった
+  // ＝貼れる数字が1軸に痩せていた、の是正。2026-08-26 レビュー指摘）。
+  function bestLine() {
+    if (best <= 0) return "";
+    return "これまでの誉れ：<em>" + best + "段　" + titleFor(best) + "</em>"
+      + (bestCombo > 0 ? "　／　会心 <em>" + bestCombo + "連</em>" : "");
   }
 
   function begin(withSound, skipDoor) {
@@ -1612,8 +1662,7 @@ const ICON = {
       testMode = !testMode;
       var el = document.getElementById("best-title");
       el.hidden = false;
-      el.innerHTML = testMode ? "<em>試し（記録は残りません）</em>"
-        : (best > 0 ? "これまでの誉れ：<em>" + best + "段　" + titleFor(best) + "</em>" : "");
+      el.innerHTML = testMode ? "<em>試し（記録は残りません）</em>" : bestLine();
       if (!testMode && best <= 0) el.hidden = true;
     }
   });
@@ -1628,7 +1677,15 @@ const ICON = {
   requestAnimationFrame(frame);
 
   // 検証用に外へ出す
-  window.__tsukikage = { get state() { return state; }, get best() { return best; }, get swap() { return swap; }, get rite() { return rite; }, stat: function () { return statLog; } };
+  window.__tsukikage = { get state() { return state; }, get best() { return best; },
+  get bestCombo() { return bestCombo; }, get swap() { return swap; }, get rite() { return rite; },
+  // 検証用: ダッキングが効いているかは音を聴かずに数値で確かめる（2026-08-26）
+  get audio() {
+    return { bgm: bgmEl ? bgmEl.volume : (bgmGain ? bgmGain.gain.value : null),
+             path: bgmEl ? "HTMLAudio(Pages)" : (bgmGain ? "WebAudio(Artifact)" : "なし"),
+             sfx: sfxBus ? sfxBus.gain.value : null, ducking: !!duckTimer };
+  },
+  stat: function () { return statLog; } };
 })();
 
 </script>
