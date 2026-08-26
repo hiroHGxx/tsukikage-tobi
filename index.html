@@ -333,6 +333,8 @@ const ICON = {
   var bestCombo = parseInt(load("tsukikage_best_combo", "0"), 10) || 0;
 
   // ---- デバッグハッシュ（最初のコミットから仕込む＝既存2作の教訓）----
+  var bootAt = performance.now();   // #autowobble: 外部の録画ツールがCDPスクリーンキャストを
+                                     // 繋ぎ終えるまで開幕を待つための起点（式札かさねの600ms待ちと同じ考え方）
   var hash = location.hash || "";
   var DBG = {
     autoperfect: hash.indexOf("autoperfect") >= 0,
@@ -340,6 +342,7 @@ const ICON = {
     stat: hash.indexOf("stat") >= 0,
     nofloat: hash.indexOf("nofloat") >= 0,
     autoskip: hash.indexOf("autoskip") >= 0,  // わざと台座を飛ばして狙う（飛ばしの確認用）
+    autowobble: hash.indexOf("autowobble") >= 0,  // 本番ルールのまま少し崩す（PV/動画撮影用）
     wx: (hash.match(/wx(\d)/) || [])[1]        // 天候を固定する（0=月夜 1=追い風 2=雨）
   };
   var statLog = [];
@@ -1447,8 +1450,26 @@ const ICON = {
   }
 
   // ---- 自動プレイ（検証用）----
+  // 撮影用（#autowobble）: 本番ルールのまま少し崩して見せる。開幕の数段はぴったり決めて
+  // 気持ちよく入り、以降は台座の縁から手前で必ず止まる範囲でときどきずらす
+  // （会心にならない「ふつうの着地」も混ぜて、自動プレイの綺麗すぎる絵を崩す。式札かさねの
+  // nextWobble と同じ考え方）。安全域を守るので落下・結果画面には行き着かない。
+  function wobbleFor(step, w) {
+    if (step < 3) return 0;                       // 開幕はぴったり決める
+    var safe = Math.max(w / 2 - 16, 6);            // 台座の縁の手前で必ず止める
+    if (Math.random() < 0.5) return 0;             // 半分は会心級にぴったり合わせる
+    var mag = Math.min(6 + step * 0.5, safe);
+    return (Math.random() < 0.5 ? -1 : 1) * mag * (0.5 + Math.random() * 0.5);
+  }
   function autoTick(s) {
-    if (s.phase === "title") { begin(false, true); return; }   // 検証時はタイトルを自分で開ける
+    // 撮影用は帳（とばり）の開幕演出を見せる。検証用（他の自動プレイ）は従来どおり素通りさせる。
+    if (s.phase === "title") {
+      // 録画ツールがナビゲーション後にCDPスクリーンキャストを繋ぐ猶予（既存2作の600ms待ちと同じ考え方）。
+      // ここで即座に開幕すると、外部から繋ぐ前に帳が開き切ってしまう。
+      if (DBG.autowobble && performance.now() - bootAt < 1200) return;
+      begin(false, !DBG.autowobble);
+      return;
+    }
     if (s.phase === "result") {
       if (performance.now() >= lockUntil) down({ preventDefault: function () { }, cancelable: false });
       return;
@@ -1462,6 +1483,7 @@ const ICON = {
     var want = platX(next) - s.charX;
     if (DBG.automiss) want *= 1.6;                       // わざと跳びすぎる
     if (DBG.autoskip && s.plats[2]) want = platX(s.plats[2]) - s.charX;   // 一つ飛ばしを狙う
+    if (DBG.autowobble) want += wobbleFor(s.step, next.w);
     var t = Math.max(0, Math.min((want / WEATHER[s.weather].mul - 72) / 300, 1));
     var held = Math.max(0.16, Math.min(t, 1.0));
     if ((performance.now() - s.chargeStart) / 1000 >= held) release();
@@ -1473,7 +1495,7 @@ const ICON = {
     var dt = Math.min((now - last) / 1000, 0.05); last = now;
     var s = state;
 
-    if (DBG.autoperfect || DBG.automiss || DBG.autoskip) autoTick(s);
+    if (DBG.autoperfect || DBG.automiss || DBG.autoskip || DBG.autowobble) autoTick(s);
 
     // カメラは「キャラが STAND_X に来る位置」を目指すが、**跳んでいる間は動かさない**。
     // 弧とカメラの移動が混ざると、右へ跳んでいるのに一度左へ流れて見える（2026-08-25 指摘）。

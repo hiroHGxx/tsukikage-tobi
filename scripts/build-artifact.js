@@ -13,9 +13,29 @@ const root = path.join(__dirname, "..");
 const read = (p) => fs.readFileSync(path.join(root, p), "utf8");
 const b64 = (p) => fs.readFileSync(path.join(root, p)).toString("base64");
 
-const SE = ["start", "count", "zan", "kiwami", "bomb", "fukaku", "whiff", "combo", "end"];
+// 埋め込む音は **src/game.js から機械的に拾う**。
+// 手で並べていたときに koto / koto_high（会心）と r5（51段以上の声）が抜け、
+// Artifact版だけ無音になっていた（2026-08-26 レビュー指摘）。
+// AUDIO_DATA に無いキーは fetch へ落ちるが、Artifact の CSP で全滅するため気づきにくい。
+const gameSrc = read("src/game.js");
+// se(...) の呼び出しごと拾って、その中の文字列を全部取る
+// （se(s.combo >= 3 ? "koto_high" : "koto", 0.9) のような三項も取りこぼさない）
+const SE = [...new Set(
+  [...gameSrc.matchAll(/\bse\(([^)]*)\)/g)]
+    .flatMap((m) => m[1].match(/"([a-z0-9_]+)"/g) || [])
+    .map((q) => q.slice(1, -1))
+)].sort();
+const VK = (gameSrc.match(/VOICE_KEYS\s*=\s*\[([^\]]*)\]/) || [, ""])[1]
+  .match(/"([a-z0-9_]+)"/g) || [];
+const VOICE_KEYS = VK.map((q) => q.slice(1, -1));
+if (!SE.length || !VOICE_KEYS.length) throw new Error("src/game.js から音のキーを拾えませんでした");
+
 const audio = {};
-for (const n of SE) audio[n] = b64(`assets/audio/${n}.m4a`);
+for (const n of SE) {
+  const f = path.join(root, "assets", "audio", `${n}.m4a`);
+  if (!fs.existsSync(f)) throw new Error(`実装が se("${n}") を鳴らすのに assets/audio/${n}.m4a がありません`);
+  audio[n] = b64(`assets/audio/${n}.m4a`);
+}
 const bgm = b64("assets/audio/bgm.m4a");
 // 背景も外部から取れないので埋め込む（PNGのままだと重いのでWebPを使う）
 const bg = {
@@ -26,10 +46,13 @@ const bg = {
 
 // ボイス（あれば埋め込む。無ければ空のまま＝鳴らないだけ）
 const voice = {};
-for (const k of ["start", "r0", "r1", "r2", "r3", "r4"]) {
+const missing = [];
+for (const k of VOICE_KEYS) {
   const f = path.join(root, "assets", "voice", `shiori_${k}.m4a`);
   if (fs.existsSync(f)) voice[k] = fs.readFileSync(f).toString("base64");
+  else missing.push(k);
 }
+if (missing.length) console.log(`  ※ 未収録のボイス: ${missing.join(", ")}（鳴らないだけで動く）`);
 
 // page.html から <style> と本文だけを取り出す（head/body は公開時に付く）
 const page = read("src/page.html");
