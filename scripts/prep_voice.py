@@ -7,8 +7,10 @@
 
 やること:
   ①前後の無音を落とす（v3は末尾に数秒の無音が付くことがある）
-  ②ピークを -1dB に揃える（台詞ごとの音量差をなくす）
-  ③96kbps AAC で assets/voice/shiori_<キー>.m4a に書き出す
+  ②**切れ際を検査する**。末尾が鳴ったまま急に止まっていたら短いフェードで畳む
+    （r1 の「でした」の「た」が母音の途中で切れていた。2026-08-26）
+  ③ピークを -1dB に揃える（台詞ごとの音量差をなくす）
+  ④96kbps AAC で assets/voice/shiori_<キー>.m4a に書き出す
 """
 import os
 import subprocess
@@ -41,7 +43,19 @@ def main():
         sys.exit("無音のようです（生成に失敗している可能性）")
     start = max(0, idx[0] / 44100 - PAD)
     end = min(len(a) / 44100, idx[-1] / 44100 + PAD)
+    # 切れ際の検査: 終端の直前がまだ鳴っていたら、そこは音の途中で切られている。
+    # 無音を落とすだけだと「急停止のプチッ」がそのまま残る（耳では気づきにくく、
+    # 波形を見れば一目で分かる類の事故）。短いフェードで畳んでおく。
+    # 見るのは「余白を足したあとの終端」ではなく **鳴っている最後の瞬間**。
+    # 終端側は余白のぶん無音なので、そこを見ても何も起きない。
     peak = float(np.abs(a).max())
+    tail = float(np.abs(a[max(0, idx[-1] - 441):idx[-1] + 1]).max())
+    fade = ""
+    if tail > peak * 0.12:
+        last = idx[-1] / 44100
+        fade = f",afade=t=out:st={max(start, last - 0.045):.3f}:d=0.050"
+        print(f"  ※ 末尾が鳴ったまま切れていた（振幅 {tail:.3f} / ピーク比 {tail/peak:.0%}）。50msのフェードで畳んだ")
+
     gain = min(10 ** (-1 / 20) / max(peak, 1e-6), 4.0)   # ピークを-1dBへ（上げすぎない）
 
     out = os.path.join(ROOT, "assets", "voice", f"shiori_{key}.m4a")
@@ -49,7 +63,7 @@ def main():
     subprocess.run([
         "ffmpeg", "-y", "-v", "error", "-i", src,
         "-ss", f"{start:.3f}", "-to", f"{end:.3f}",
-        "-vn", "-map", "0:a", "-af", f"volume={gain:.3f}",
+        "-vn", "-map", "0:a", "-af", f"volume={gain:.3f}{fade}",
         "-c:a", "aac", "-b:a", "96k", out
     ], check=True)
     print(f"{key}: {len(a)/44100:.2f}秒 → {end-start:.2f}秒（無音を落とし、ピークを-1dBに）→ {os.path.relpath(out, ROOT)}")
