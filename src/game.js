@@ -315,7 +315,7 @@
     state.plats = [{ x: STAND_X, w: 130, amp: 0, spd: 900, ph: 0 }];
     for (var i = 0; i < 4; i++) pushPlat(state);
     lockUntil = performance.now() + 700;   // 開始・リトライ直後は入力を止める（既存2作の作法）
-    ripples.length = 0; swap.t = 0; rite.t = 0;
+    ripples.length = 0; swap.t = 0; swap.pending = null; rite.t = 0;
     state.charX = STAND_X; state.charOff = 0; state.camX = 0;
     state.order = shuffled(IDS);   // 毎回ちがう御霊から始まり、ちがう順で出る
     state.test = testMode;
@@ -421,10 +421,10 @@
     if (Math.floor(s.step / 10) > Math.floor(prevStep / 10) && !(prevStep < 50 && s.step >= 50)) {
       flash(s.step + "段", C.kindei);   // 50段は満月成就の儀に譲る
     }
-    // 5段ごとに御霊が交代する（34体を巡回＝素材がそのまま尺になる）
-    if (Math.floor(s.step / SWAP_EVERY) > Math.floor(prevStep / SWAP_EVERY)) { s.charIdx++; showSwap(currentChar()); }
-    // 満月（50段）
+    // 満月（50段）。**交代より先に立てる**——重なったときに儀を優先させるため（下の showSwap 参照）
     if (prevStep < 50 && s.step >= 50) moonRite();
+    // 4段ごとに御霊が交代する（34体を巡回＝素材がそのまま尺になる）
+    if (Math.floor(s.step / SWAP_EVERY) > Math.floor(prevStep / SWAP_EVERY)) { s.charIdx++; showSwap(currentChar()); }
     s.moonPhase = Math.max(s.moonPhase, Math.min(s.step / 50, 1));
   }
 
@@ -462,6 +462,9 @@
   // 帳のときと同じで、終わるまで跳べない（lockUntil）。
   var rite = { t: 0, sparks: [] };
   function moonRite() {
+    // 走っているカットインはここで畳む（沈めた画面の下から帯と立ち絵が透けるため）。
+    // 途中まで見えていたものは見えたぶんで打ち切り、儀のあとに出すのは**新しい交代だけ**にする。
+    swap.t = 0;
     rite.t = 1.0;
     rite.sparks = [];
     for (var i = 0; i < 46; i++) {
@@ -477,6 +480,7 @@
   function drawRite(dt) {
     if (rite.t <= 0) return;
     rite.t = Math.max(0, rite.t - dt / 1.9);
+    if (rite.t <= 0 && swap.pending) { var q = swap.pending; swap.pending = null; showSwap(q); }
     var p = 1 - rite.t;                    // 0→1
     var fade = p < 0.12 ? p / 0.12 : (p > 0.82 ? Math.max(0, (1 - p) / 0.18) : 1);
 
@@ -539,8 +543,14 @@
   }
 
   // 御霊の交代を見せる（顔アイコン＋名前＋重い/軽い）
-  var swap = { t: 0, id: null };
-  function showSwap(id) { swap.t = 1.0; swap.id = id; }
+  var swap = { t: 0, id: null, pending: null };
+  // 満月成就の儀と重なったら、カットインは**積んでおいて儀のあとに出す**。
+  // 儀は画面全体を沈めるので、そのまま出すと帯の下で1.5秒が過ぎ、
+  // 「誰に代わったのか分からないまま」になる（段数の刻みが変わると実際に重なる）。
+  function showSwap(id) {
+    if (rite.t > 0) { swap.pending = id; return; }
+    swap.t = 1.0; swap.id = id;
+  }
   // 御霊の交代カットイン。御霊おとしの咲耶カットインと同じ流儀で、
   // 帯の上をシャキンと左から入り、真ん中で一瞬止まり、右へ抜ける。
   // 帯と絵は石垣より「後ろ」に描く（手前だと次の石垣と会心の帯が隠れて遊びの邪魔になる）。
@@ -679,12 +689,12 @@
       for (var k = 0; k < 10; k++) { s.plats.shift(); pushPlat(s); }
       s.charOff = 0; s.charX = platX(s.plats[0]);
       s.moonPhase = Math.max(s.moonPhase, Math.min(s.step / 50, 1));
-      if (Math.floor(s.step / SWAP_EVERY) > Math.floor(prev / SWAP_EVERY)) { s.charIdx++; showSwap(currentChar()); }
       if (prev < 50 && s.step >= 50) moonRite(); else flash(s.step + "段", C.kindei);
+      if (Math.floor(s.step / SWAP_EVERY) > Math.floor(prev / SWAP_EVERY)) { s.charIdx++; showSwap(currentChar()); }
     } else if (b.i === 2) {                            // 次の御霊のカットインを見る
       s.charIdx++; showSwap(currentChar());
     } else if (b.i === 3) {                            // 台詞を順に鳴らす
-      var keys = ["start", "r0", "r1", "r2", "r3", "r4"];
+      var keys = ["start", "r0", "r1", "r2", "r3", "r4", "r5"];
       var k2 = keys[voiceCycle % keys.length]; voiceCycle++;
       voice(k2); flash("声 " + k2, C.anshi);
     } else {                                           // 落ちない/落ちるの切替
@@ -1336,5 +1346,5 @@
   requestAnimationFrame(frame);
 
   // 検証用に外へ出す
-  window.__tsukikage = { get state() { return state; }, get best() { return best; }, get swap() { return swap; }, stat: function () { return statLog; } };
+  window.__tsukikage = { get state() { return state; }, get best() { return best; }, get swap() { return swap; }, get rite() { return rite; }, stat: function () { return statLog; } };
 })();
