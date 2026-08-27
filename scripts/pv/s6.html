@@ -1,0 +1,35 @@
+<link rel="stylesheet" href="_base.css">
+<style>
+  body { background: #131320; }
+  .bg {
+    position: absolute; inset: 0; opacity: .34;
+    background: url(../../assets/art/title.webp) center 22% / cover no-repeat;
+  }
+  .veil {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(60% 42% at 50% 40%, rgba(240,206,126,.10), transparent 70%),
+      linear-gradient(180deg, rgba(19,19,32,.72), rgba(19,19,32,.94));
+  }
+  .mid { position: relative; text-align: center; }
+  /* letter-spacing の分だけ右に寄るので text-indent で戻す */
+  .ttl { font-size: 96px; font-weight: 800; letter-spacing: .20em; text-indent: .20em; }
+  .sub { margin-top: 26px; font-size: 22px; letter-spacing: .13em; color: #9D93B5; }
+  .rule {
+    width: 200px; height: 1px; margin: 44px auto;
+    background: linear-gradient(90deg, transparent, #6d5a33, transparent);
+  }
+  .url { font-size: 25px; letter-spacing: .07em; color: #F0CE7E; }
+  .free { margin-top: 18px; font-size: 20px; letter-spacing: .13em; color: #9D93B5; }
+</style>
+<div class="wrap">
+  <div class="bg"></div>
+  <div class="veil"></div>
+  <div class="mid">
+    <div class="ttl gold">月影とび</div>
+    <div class="sub">— 月蝕綺譚 -Luna Occulta- 二次創作 —</div>
+    <div class="rule"></div>
+    <div class="url">hirohgxx.github.io/tsukikage-tobi/</div>
+    <div class="free">ブラウザですぐ遊べます</div>
+  </div>
+</div>

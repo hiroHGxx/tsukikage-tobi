@@ -7,3 +7,12 @@ dist/
 # 実機スクショにオーナー端末のステータスバーが写るため追跡しない（2026-08-27）
 docs/ut/
 ut.config.yaml
+# PVの中間素材。式札かさねと同じで、追跡するのは作り方（スクリプト・HTML・リスト）だけ。
+# 動画と画像は scripts/pv/ の一式から作り直せる（2026-08-27）
+scripts/pv/*.png
+scripts/pv/*.mp4
+scripts/pv/*.webm
+scripts/pv/events.json
+scripts/pv/frames/
+media/*.mp4
+media/*.png

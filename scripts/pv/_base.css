@@ -1,0 +1,16 @@
+@import url('https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@500;700;800&display=swap');
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  width: 720px; height: 1280px; overflow: hidden;
+  font-family: "Shippori Mincho B1", "Hiragino Mincho ProN", serif;
+  color: #E8E4D8;
+}
+.wrap {
+  width: 720px; height: 1280px; position: relative;
+  display: flex; align-items: center; justify-content: center;
+}
+/* 題字と見出しの金グラデ（本体のトンマナ「宵闇に金」と同じ） */
+.gold {
+  background: linear-gradient(180deg, #F6E3AE 0%, #F0CE7E 42%, #D9A94C 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}

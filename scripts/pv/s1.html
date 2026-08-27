@@ -1,0 +1,25 @@
+<link rel="stylesheet" href="_base.css">
+<style>
+  body { background: #131320; }
+  .bg {
+    position: absolute; inset: 0;
+    background: url(../../assets/art/title.webp) center / cover no-repeat;
+  }
+  /* 下半分を沈めて文字を乗せる。上の月は明るいまま残す */
+  .veil {
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg,
+      rgba(19,19,32,.25) 0%, rgba(19,19,32,.05) 45%, rgba(19,19,32,.86) 100%);
+  }
+  .copy {
+    position: absolute; left: 0; right: 0; bottom: 186px;
+    text-align: center; line-height: 2.05;
+    font-size: 38px; font-weight: 700; letter-spacing: .16em;
+    text-shadow: 0 2px 24px rgba(0,0,0,.85);
+  }
+</style>
+<div class="wrap">
+  <div class="bg"></div>
+  <div class="veil"></div>
+  <div class="copy">月へ続く道は、<br>夜ごと架け替えられる。</div>
+</div>

@@ -1,0 +1,13 @@
+file 'mc_1.png'
+duration 0.8
+file 'mc_2.png'
+duration 0.8
+file 'mc_3.png'
+duration 0.8
+file 'mc_4.png'
+duration 0.8
+file 'mc_5.png'
+duration 0.8
+file 'mc_6.png'
+duration 0.8
+file 'mc_6.png'
