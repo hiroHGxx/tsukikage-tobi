@@ -3,3 +3,7 @@ node_modules/
 .DS_Store
 dist/
 .tmp_ogp/
+# 目付（UT）の作業物。生成物の公開はライセンス上OKだが、
+# 実機スクショにオーナー端末のステータスバーが写るため追跡しない（2026-08-27）
+docs/ut/
+ut.config.yaml
