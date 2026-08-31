@@ -42,6 +42,26 @@ async function run(base, hash, until, timeout, shot, opts = {}) {
       errors.push("console: " + m.text());
     }
   });
+  // **本物の sdk.js を遮断する。**下で偽のSDKを置くが、本物を読ませたままにすると
+  // 本物が偽物を上書きしうる（defineProperty を configurable で置いている以上、
+  // 相手の書き方次第で破れる）。破れた瞬間、検査の走行が**本番の番付に載る**。
+  // 姉妹作（宵あらわし）が2026-08-31に踏みかけた。ここで断てば相手の実装に依存しない。
+  // 断り方は abort ではなく**空の200を返す**。abort だと net::ERR_FAILED がコンソールに出て、
+  // 「本体の誤りだけを見る」はずの検査が自分の仕掛けで赤くなる（実際に一度 exit 1 にした）。
+  await page.setRequestInterception(true);
+  page.on("request", (r) => {
+    if (r.url().includes("waiwai.town/sdk.js")) {
+      // **CORSヘッダを付ける。**読み込み側のタグに crossorigin="anonymous" を付けてある
+      // （COEP下で黙ってブロックされるのを避けるため意図的にそうしている）ので、
+      // 偽の応答も CORS に答えないと弾かれ、net::ERR_FAILED がコンソールに出る。
+      r.respond({
+        status: 200,
+        contentType: "text/javascript",
+        headers: { "Access-Control-Allow-Origin": "*" },
+        body: "",
+      });
+    } else r.continue();
+  });
   // 全国ランキングへの送信を数える。**自動プレイと試しモードからは1回も呼ばれてはいけない。**
   // 本作はエンドレスで #autoperfect に終わりが無く、塞がないと青天井のスコアが本番へ載る。
   await page.evaluateOnNewDocument(() => {
