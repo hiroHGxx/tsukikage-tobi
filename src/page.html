@@ -144,7 +144,11 @@
     text-wrap:balance;cursor:pointer;
   }
   .game-sub{font-size:12px;letter-spacing:.15em;color:var(--ink-dim);margin-top:-6px;}
-  #best-title{font-size:12px;letter-spacing:.14em;color:var(--ink-dim);margin-top:-4px;}
+  /* 行末に一文字だけ取り残されるのを避ける（375px幅で「12連」「る」が孤立していた。
+     text-wrap は未対応のブラウザでは黙って無視されるので、崩れる心配はない）。 */
+  #best-title{font-size:12px;letter-spacing:.14em;color:var(--ink-dim);margin-top:-4px;
+    text-wrap:balance;}
+  .howto li,.story{text-wrap:pretty;}
   #best-title em{font-style:normal;color:var(--moon);}
   .story{font-size:12px;line-height:1.9;letter-spacing:.06em;color:var(--ink);text-align:center;}
   .howto{list-style:none;display:flex;flex-direction:column;gap:8px;font-size:13px;line-height:1.6;color:var(--ink);text-align:left;}

@@ -902,9 +902,9 @@
     ctx.fillStyle = goldGrad(566, 40);
     textLS("満月成就", W / 2, 566, 13 * ease, "center");
     ctx.restore();
-    ctx.font = "500 12px " + MINCHO; ctx.fillStyle = C.ink;
+    ctx.font = "500 16px " + MINCHO; ctx.fillStyle = C.ink;
     textLS("五十段の高みで、満月に逢えた", W / 2, 600, 2.0, "center");
-    ctx.font = "700 15px " + MINCHO; ctx.fillStyle = C.kindei;
+    ctx.font = "700 18px " + MINCHO; ctx.fillStyle = C.kindei;
     textLS("この先も、記録は伸ばせる", W / 2, 628, 2.0, "center");
     ctx.restore();
   }
@@ -999,7 +999,7 @@
     ctx.beginPath(); ctx.moveTo(tx - 10, by + 26); ctx.lineTo(tx - 10, by + 90); ctx.stroke();
     ctx.fillStyle = C.ink; ctx.font = "800 30px 'Shippori Mincho B1',serif";
     ctx.fillText(NAMES[id] || id, tx, by + 58);
-    ctx.fillStyle = C.kindei; ctx.font = "600 15px 'Shippori Mincho B1',serif";
+    ctx.fillStyle = C.kindei; ctx.font = "600 18px 'Shippori Mincho B1',serif";
     ctx.fillText(TAGS[id] || "", tx, by + 82);
     ctx.restore();
   }
@@ -1050,7 +1050,7 @@
     ctx.beginPath(); ctx.moveTo(0, H - 52); ctx.lineTo(W, H - 52); ctx.stroke();
     ctx.textAlign = "center";
     testButtons().forEach(function (b) {
-      ctx.fillStyle = C.ink; ctx.font = "700 15px 'Shippori Mincho B1',serif";
+      ctx.fillStyle = C.ink; ctx.font = "700 18px 'Shippori Mincho B1',serif";
       ctx.fillText(b.t, b.x + b.w / 2, H - 20);
       if (b.i > 0) {
         ctx.strokeStyle = "rgba(232,228,216,.16)";
@@ -1059,7 +1059,7 @@
     });
     // 記録が残らないことを明示する
     ctx.textAlign = "left";
-    ctx.fillStyle = C.shokko; ctx.font = "700 13px 'Shippori Mincho B1',serif";
+    ctx.fillStyle = C.shokko; ctx.font = "700 16px 'Shippori Mincho B1',serif";
     ctx.fillText("試し（記録は残りません）", 14, H - 62);
     ctx.restore();
   }
@@ -1184,8 +1184,12 @@
     roundRect(x + 1.5, y + 1.5, w - 3, h - 3, (r || 8) - 1);
     ctx.strokeStyle = "rgba(184,155,90,.25)"; ctx.lineWidth = 1; ctx.stroke();
   }
-  function label(text, x, y, align) {   // 9px・字間.2em・補助色（2作のラベルと同じ）
-    ctx.font = "500 10px " + MINCHO; ctx.fillStyle = C.inkDim;
+  // 文字の系（2026-09-01 意匠）: 補助/ラベル=16 ／ 本文=18 ／ 小見出し=21 ／ 大きな数字=34-44。
+  // **床は実寸12px**（設えの正典）。この canvas は内部480pxを min(100vw,100vh*0.6667) へ
+  // 縮めて出すので、375×553 では 0.768 倍——**canvas側16px でようやく実寸12.3px**。
+  // 「12pxと書いたから足りている」は嘘で、13〜15pxも床を割っていた。
+  function label(text, x, y, align) {   // 補助・ラベル（16px＝床）
+    ctx.font = "500 16px " + MINCHO; ctx.fillStyle = C.inkDim;
     textLS(text, x, y, 2.0, align || "left");
   }
   function num(text, x, y, size, color, align) {   // 数字は丸ゴシック（2作と同じ）
@@ -1430,20 +1434,23 @@
     ctx.fillStyle = band; ctx.fillRect(0, 0, W, 96);
 
     // 左: 題字（金のグラデ・字間.14em）＋ローマ字（式札かさねの h1 と同じ作り）
-    ctx.font = "800 17px " + MINCHO;
-    ctx.fillStyle = goldGrad(26, 17);
-    textLS("月影とび", 16, 28, 2.4, "left");
-    ctx.font = "500 9px " + MINCHO; ctx.fillStyle = C.inkDim;
-    textLS("TSUKIKAGE TOBI", 16, 42, 2.0, "left");
+    // ローマ字を床(16px)まで上げたぶん、題字も上げないと**ローマ字のほうが大きく見える**
+    // （床を上げるときは、その上に載っていたものも一緒に上げる）。
+    ctx.font = "800 22px " + MINCHO;
+    ctx.fillStyle = goldGrad(24, 22);
+    textLS("月影とび", 16, 30, 2.4, "left");
+    ctx.font = "500 16px " + MINCHO; ctx.fillStyle = C.inkDim;
+    textLS("TSUKIKAGE TOBI", 16, 50, 2.0, "left");
 
     // 右: 金枠のスタッツ箱（段・最高）＋いまの御霊の顔
     var faceR = 19, faceX = W - 16 - faceR;
-    var boxW = 150, boxH = 44, boxX = faceX - faceR - 10 - boxW, boxY = 14;
+    // 「さいこう」は16pxで実測70px。旧 150px 幅では右へ4px溢れていた
+    var boxW = 176, boxH = 50, boxX = faceX - faceR - 10 - boxW, boxY = 14;
     panel(boxX, boxY, boxW, boxH, 8);
-    label("だん", boxX + 14, boxY + 16, "left");
-    num(s.step, boxX + 14, boxY + 36, 20, C.ink, "left");
-    label("さいこう", boxX + 84, boxY + 16, "left");
-    num(best, boxX + 84, boxY + 36, 20, C.inkDim, "left");
+    label("だん", boxX + 14, boxY + 20, "left");
+    num(s.step, boxX + 14, boxY + 42, 20, C.ink, "left");
+    label("さいこう", boxX + 96, boxY + 20, "left");
+    num(best, boxX + 96, boxY + 42, 20, C.inkDim, "left");
 
     var id = currentChar(), ic = icons[id];
     ctx.save();
@@ -1456,20 +1463,32 @@
     ctx.restore();
 
     // 天候（左下に小さな金枠の札。既存2作の chip と同じ質感）
-    var cw = 116, ch = 30, cx0 = 16, cy0 = 52;
+    // 幅は決め打ちをやめ、**中身を測ってから札を敷く**（文字を大きくするたびに溢れるため）。
+    // いちばん長いのは「追い風 伸びすぎる」。
+    var ch = 34, cx0 = 16, cy0 = 60;
+    ctx.font = "800 18px " + MINCHO;
+    var nameW = ctx.measureText(w.name).width + 1.6 * (w.name.length - 1);
+    ctx.font = "500 16px " + MINCHO;
+    var noteW = ctx.measureText(w.note).width + 0.8 * (w.note.length - 1);
+    var cw = 10 + nameW + 8 + noteW + 10;
     panel(cx0, cy0, cw, ch, 6);
-    ctx.font = "800 13px " + MINCHO; ctx.fillStyle = w.color;
-    var nameW = textLS(w.name, cx0 + 10, cy0 + 20, 1.6, "left");
-    ctx.font = "500 10px " + MINCHO; ctx.fillStyle = C.inkDim;
-    textLS(w.note, cx0 + 10 + nameW + 8, cy0 + 20, 0.8, "left");
+    ctx.font = "800 18px " + MINCHO; ctx.fillStyle = w.color;
+    textLS(w.name, cx0 + 10, cy0 + 23, 1.6, "left");
+    ctx.font = "500 16px " + MINCHO; ctx.fillStyle = C.inkDim;
+    textLS(w.note, cx0 + 10 + nameW + 8, cy0 + 23, 0.8, "left");
 
     // 会心の連（左の列。中央に置くとスタッツ箱と重なる）
     if (s.combo >= 2) {
-      var kw = 116, kh = 30, kx = 16, ky = cy0 + ch + 8;
+      var kh = 34, kx = 16, ky = cy0 + ch + 8;
+      ctx.font = "500 16px " + MINCHO;
+      var lw = ctx.measureText("かいしん").width + 2.0 * 3;
+      var numText = s.combo + " 連";
+      ctx.font = "800 16px " + ROUND;
+      var kw = 10 + lw + 10 + ctx.measureText(numText).width + 10;
       panel(kx, ky, kw, kh, 6);
-      ctx.font = "500 9px " + MINCHO; ctx.fillStyle = C.inkDim;
-      var lw = textLS("かいしん", kx + 10, ky + 20, 2.0, "left");
-      num(s.combo + " 連", kx + 10 + lw + 10, ky + 21, 16, C.moon, "left");
+      ctx.font = "500 16px " + MINCHO; ctx.fillStyle = C.inkDim;
+      textLS("かいしん", kx + 10, ky + 23, 2.0, "left");
+      num(numText, kx + 10 + lw + 10, ky + 23, 16, C.moon, "left");
     }
     ctx.restore();
   }
@@ -1516,31 +1535,31 @@
     textLS("月影とび", W / 2, cy0 + 62, 10.8, "center");
     ctx.restore();
 
-    ctx.font = "500 10px " + MINCHO; ctx.fillStyle = C.inkDim;
+    ctx.font = "500 16px " + MINCHO; ctx.fillStyle = C.inkDim;
     textLS("TSUKIKAGE TOBI", W / 2, cy0 + 84, 2.2, "center");
 
     // 罫（2作のカード内の区切りと同じ）
     ctx.strokeStyle = "rgba(184,155,90,.35)"; ctx.lineWidth = 1;
     ctx.beginPath(); ctx.moveTo(cx0 + 40, cy0 + 100); ctx.lineTo(cx0 + cw - 40, cy0 + 100); ctx.stroke();
 
-    ctx.font = "700 14px " + MINCHO; ctx.fillStyle = C.ink;
+    ctx.font = "700 18px " + MINCHO; ctx.fillStyle = C.ink;
     textLS("長押しで力を溜め、離して跳ぶ", W / 2, cy0 + 126, 1.2, "center");
-    ctx.font = "500 12px " + MINCHO; ctx.fillStyle = C.inkDim;
+    ctx.font = "500 16px " + MINCHO; ctx.fillStyle = C.inkDim;
     textLS("式札の道を、月まで", W / 2, cy0 + 148, 1.6, "center");
 
     if (best > 0) {
-      ctx.font = "500 9px " + MINCHO; ctx.fillStyle = C.inkDim;
+      ctx.font = "500 16px " + MINCHO; ctx.fillStyle = C.inkDim;
       textLS("これまでのほまれ", W / 2, cy0 + 172, 2.2, "center");
       ctx.font = "800 17px " + ROUND; ctx.fillStyle = C.kindei;
       ctx.textAlign = "center"; ctx.fillText(best + "段  " + titleFor(best), W / 2, cy0 + 192); ctx.textAlign = "left";
     }
 
     ctx.globalAlpha = 0.55 + Math.sin(performance.now() / 380) * 0.35;
-    ctx.font = "700 15px " + MINCHO; ctx.fillStyle = C.ink;
+    ctx.font = "700 18px " + MINCHO; ctx.fillStyle = C.ink;
     textLS("画面を長押し", W / 2, 596, 3.2, "center");
     ctx.globalAlpha = 1;
 
-    ctx.font = "500 10px " + MINCHO;
+    ctx.font = "500 16px " + MINCHO;
     ctx.fillStyle = testMode ? C.shokko : "rgba(157,147,181,.45)";
     textLS(testMode ? "試しモード（題字を3回タップで戻る）" : "題字を3回すばやくタップで試しモード", W / 2, 648, 1.0, "center");
     ctx.restore();
@@ -1551,7 +1570,10 @@
     ctx.save();
     ctx.fillStyle = "rgba(10,10,20,.74)"; ctx.fillRect(0, 0, W, H);
 
-    var cw = 320, ch = 300, cx0 = (W - cw) / 2, cy0 = 196;
+    // 札の寸法は**中の文字を床(16px)まで上げた結果**から決めている。
+    // 320px幅では「さいこうだん」「さいこうれん」（各16px＝実測103px）が3列で衝突した。
+    // 列の間合いは 124px 取れる 380px幅に広げ、縦は見出しと理由の重なりを避けて8px伸ばした。
+    var cw = 380, ch = 308, cx0 = (W - cw) / 2, cy0 = 188;
     // 最後に跳んでいた御霊を、札の上縁に立たせる。
     // 3作で唯一「絵が1枚も無いリザルト」だった（2026-08-26 レビュー指摘）。
     // 記録更新の瞬間はスクショされる場所なので、誰が連れて行ったかを残す。
@@ -1571,43 +1593,43 @@
     ctx.font = "800 21px " + MINCHO;
     ctx.fillStyle = clear ? C.moon : C.shokko;
     textLS(clear ? "満月成就" : "夜明け", W / 2, cy0 + 40, 6.3, "center");
-    ctx.font = "500 10px " + MINCHO; ctx.fillStyle = C.inkDim;
-    textLS(s.overReason, W / 2, cy0 + 60, 1.6, "center");
+    ctx.font = "500 16px " + MINCHO; ctx.fillStyle = C.inkDim;
+    textLS(s.overReason, W / 2, cy0 + 64, 1.6, "center");
 
     ctx.strokeStyle = "rgba(184,155,90,.35)"; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(cx0 + 36, cy0 + 76); ctx.lineTo(cx0 + cw - 36, cy0 + 76); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx0 + 36, cy0 + 80); ctx.lineTo(cx0 + cw - 36, cy0 + 80); ctx.stroke();
 
     // 到達段数（丸ゴシック・2作の final-score と同じ扱い）
-    ctx.font = "500 9px " + MINCHO; ctx.fillStyle = C.inkDim;
-    textLS("とうたつ", W / 2, cy0 + 98, 2.4, "center");
-    num(s.step + "段", W / 2, cy0 + 146, 44, clear ? C.moon : C.ink, "center");
+    ctx.font = "500 16px " + MINCHO; ctx.fillStyle = C.inkDim;
+    textLS("とうたつ", W / 2, cy0 + 102, 2.4, "center");
+    num(s.step + "段", W / 2, cy0 + 150, 44, clear ? C.moon : C.ink, "center");
 
     ctx.font = "700 17px " + MINCHO; ctx.fillStyle = C.ink;
-    textLS(titleFor(s.step), W / 2, cy0 + 176, 2.4, "center");
+    textLS(titleFor(s.step), W / 2, cy0 + 180, 2.4, "center");
 
     ctx.strokeStyle = "rgba(184,155,90,.22)";
-    ctx.beginPath(); ctx.moveTo(cx0 + 36, cy0 + 196); ctx.lineTo(cx0 + cw - 36, cy0 + 196); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx0 + 36, cy0 + 200); ctx.lineTo(cx0 + cw - 36, cy0 + 200); ctx.stroke();
 
     // 今回の会心連と、記録2種を3列で並べる。
     // 腕前の2軸目（会心連続）は保存だけして表示していなかった（2026-08-26 レビュー指摘）。
     // Discordに貼れる数字を段数の1軸に痩せさせない。
-    var col = [cx0 + 58, W / 2, cx0 + cw - 58];
-    ctx.font = "500 9px " + MINCHO; ctx.fillStyle = C.inkDim;
-    textLS("かいしん", col[0], cy0 + 218, 2.2, "center");
-    textLS("さいこうだん", col[1], cy0 + 218, 1.4, "center");
-    textLS("さいこうれん", col[2], cy0 + 218, 1.4, "center");
-    num(s.maxCombo + " 連", col[0], cy0 + 244, 19, s.newBestCombo ? C.moon : C.ink, "center");
-    num(best + "段", col[1], cy0 + 244, 19, C.ink, "center");
-    num(bestCombo + " 連", col[2], cy0 + 244, 19, C.ink, "center");
+    var col = [cx0 + 66, W / 2, cx0 + cw - 66];   // 列の中心。間合い124px（最長ラベル103px＋余白）
+    ctx.font = "500 16px " + MINCHO; ctx.fillStyle = C.inkDim;
+    textLS("かいしん", col[0], cy0 + 222, 2.2, "center");
+    textLS("さいこうだん", col[1], cy0 + 222, 1.4, "center");
+    textLS("さいこうれん", col[2], cy0 + 222, 1.4, "center");
+    num(s.maxCombo + " 連", col[0], cy0 + 248, 19, s.newBestCombo ? C.moon : C.ink, "center");
+    num(best + "段", col[1], cy0 + 248, 19, C.ink, "center");
+    num(bestCombo + " 連", col[2], cy0 + 248, 19, C.ink, "center");
 
     if (s.newBest || s.newBestCombo) {
-      ctx.font = "700 12px " + MINCHO; ctx.fillStyle = C.kindei;
+      ctx.font = "700 16px " + MINCHO; ctx.fillStyle = C.kindei;
       textLS(s.newBest && s.newBestCombo ? "だんも れんも こうしん"
         : s.newBest ? "じこさいこうを こうしん" : "かいしんの れんを こうしん",
-        W / 2, cy0 + 276, 2.0, "center");
+        W / 2, cy0 + 280, 2.0, "center");
     } else if (s.test) {
-      ctx.font = "700 12px " + MINCHO; ctx.fillStyle = C.shokko;
-      textLS("試し（記録は残りません）", W / 2, cy0 + 276, 1.6, "center");
+      ctx.font = "700 16px " + MINCHO; ctx.fillStyle = C.shokko;
+      textLS("試し（記録は残りません）", W / 2, cy0 + 280, 1.6, "center");
     }
 
     // 全国順位（取れた夜だけ）。札の下、「もう一夜」との間に置く。
@@ -1643,7 +1665,7 @@
     }
 
     ctx.globalAlpha = 0.55 + Math.sin(performance.now() / 380) * 0.35;
-    ctx.font = "700 15px " + MINCHO; ctx.fillStyle = C.ink;
+    ctx.font = "700 18px " + MINCHO; ctx.fillStyle = C.ink;
     textLS("もう一夜", W / 2, 596, 3.2, "center");
     ctx.restore();
   }
