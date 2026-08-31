@@ -43,6 +43,45 @@
   /* ================= 帳（とばり）=================
      開幕に左右へ開く黒緞子の扉。式札かさねの意匠をそのまま持ってきている
      （合わせ目に金襴の帯を通す） */
+  /* ---- 番付（わいわいタウンの全国ランキング） ---- */
+  /* 結果の札は canvas に描いているが、番付は他人の名前が並ぶ一覧なので DOM で持つ
+     （canvas に流し込むと、指で送れない・読み上げに乗らない・名前の長さで崩れる）。 */
+  #banzuke{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(10,10,24,.78);z-index:26;}
+  #banzuke.show{display:flex;}
+  .bz-card{position:relative;background:linear-gradient(170deg,rgba(28,24,54,.93),rgba(19,16,38,.95));
+    border:1px solid #b89b5a;box-shadow:0 0 0 3px rgba(19,16,38,.9),0 0 0 4px var(--line),0 14px 50px rgba(0,0,0,.65);
+    border-radius:10px;padding:24px 22px 22px;text-align:center;display:flex;flex-direction:column;gap:12px;
+    width:min(92vw,340px);box-sizing:border-box;}
+  #bz-close{position:absolute;top:10px;right:12px;width:32px;height:32px;font-family:inherit;font-size:14px;
+    color:var(--ink-dim);background:transparent;border:1px solid var(--line);border-radius:5px;cursor:pointer;}
+  #bz-close:focus-visible{outline:2px solid var(--moon);outline-offset:2px;}
+  #bz-head{font-size:16px;font-weight:800;letter-spacing:.34em;color:var(--moon);}
+  #bz-sub{font-size:12px;letter-spacing:.12em;color:var(--ink-dim);margin-top:-8px;}
+  #bz-sub em{font-style:normal;font-weight:800;color:var(--kindei);}
+  #bz-list,#bz-me{list-style:none;display:flex;flex-direction:column;gap:3px;}
+  /* 背の低い画面のときだけ効く安全弁。body の touch-action を打ち消さないと指で送れない */
+  #bz-list{max-height:58vh;overflow-y:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch;}
+  .bz-row{display:flex;align-items:baseline;gap:10px;padding:7px 10px;border:1px solid transparent;
+    border-radius:5px;background:rgba(232,228,216,.05);text-align:left;}
+  .bz-rank{flex:0 0 2.1em;text-align:right;font-size:13px;font-weight:800;letter-spacing:.04em;color:var(--ink-dim);}
+  .bz-row.top .bz-rank{color:var(--moon);}
+  .bz-name{flex:1 1 auto;min-width:0;font-size:14px;color:var(--ink);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .bz-score{flex:0 0 auto;font-family:"M PLUS Rounded 1c","Hiragino Sans",sans-serif;font-size:15px;
+    font-weight:800;color:var(--kindei);font-variant-numeric:tabular-nums;}
+  /* 会心の連は段のあとに小さく添える（段が主・連が従の一軸をそのまま画に写す） */
+  .bz-score small{font-size:12px;font-weight:500;color:var(--ink-dim);margin-left:3px;}
+  /* 自分の行は金泥の縁で見分ける（上位に居ればその行に・居なければ下に1行足す） */
+  .bz-row.me{border-color:var(--kindei);background:rgba(217,169,76,.12);}
+  .bz-row.me .bz-name{color:var(--moon);}
+  /* 地が金泥寄りに温まるぶん、順位の数字も --ink-dim ではなく --moon にする
+     （明るい地の上で --ink-dim は読みの床4.5を割る。御霊おとしで実測） */
+  .bz-row.me .bz-rank{color:var(--moon);}
+  .bz-row.me .bz-score small{color:var(--ink);}
+  #bz-gap{font-size:13px;line-height:1;letter-spacing:.3em;color:var(--ink-dim);margin:-4px 0;}
+  #bz-gap[hidden],#bz-me[hidden]{display:none;}
+
   #door{position:fixed;inset:0;display:none;z-index:25;pointer-events:none;overflow:hidden;}
   #door.show{display:block;}
   .door-half{
@@ -104,21 +143,21 @@
     filter:drop-shadow(0 0 14px rgba(240,206,126,.30)) drop-shadow(0 2px 6px rgba(0,0,0,.55));
     text-wrap:balance;cursor:pointer;
   }
-  .game-sub{font-size:10px;letter-spacing:.15em;color:var(--ink-dim);margin-top:-6px;}
-  #best-title{font-size:10px;letter-spacing:.14em;color:var(--ink-dim);margin-top:-4px;}
+  .game-sub{font-size:12px;letter-spacing:.15em;color:var(--ink-dim);margin-top:-6px;}
+  #best-title{font-size:12px;letter-spacing:.14em;color:var(--ink-dim);margin-top:-4px;}
   #best-title em{font-style:normal;color:var(--moon);}
   .story{font-size:12px;line-height:1.9;letter-spacing:.06em;color:var(--ink);text-align:center;}
   .howto{list-style:none;display:flex;flex-direction:column;gap:8px;font-size:13px;line-height:1.6;color:var(--ink);text-align:left;}
   .howto li::before{content:"〇 ";color:var(--kindei);}
   #start{
     font-family:inherit;font-size:15px;font-weight:700;letter-spacing:.25em;
-    color:var(--night);background:var(--moon);border:none;border-radius:6px;padding:14px 30px;cursor:pointer;
+    color:var(--night);background:var(--moon);border:none;border-radius:5px;padding:14px 30px;cursor:pointer;
   }
   #start:focus-visible{outline:3px solid var(--moon);outline-offset:2px;}
-  .sound-note{font-size:10px;letter-spacing:.1em;color:var(--ink-dim);margin-top:-6px;}
+  .sound-note{font-size:12px;letter-spacing:.1em;color:var(--ink-dim);margin-top:-6px;}
   #start-silent{
     font-family:inherit;font-size:12px;letter-spacing:.15em;color:var(--ink-dim);
-    background:transparent;border:1px solid var(--line);border-radius:6px;padding:9px 18px;cursor:pointer;
+    background:transparent;border:1px solid var(--line);border-radius:5px;padding:9px 18px;cursor:pointer;
   }
   #start-silent:focus-visible{outline:2px solid var(--moon);outline-offset:2px;}
 </style>
@@ -146,11 +185,26 @@
   </div>
 </div>
 
+<div id="banzuke" role="dialog" aria-label="番付">
+  <div class="bz-card">
+    <button id="bz-close" aria-label="番付を閉じる">✕</button>
+    <div id="bz-head">番付</div>
+    <div id="bz-sub" hidden></div>
+    <ol id="bz-list"></ol>
+    <div id="bz-gap" aria-hidden="true" hidden>⋮</div>
+    <ol id="bz-me" hidden></ol>
+  </div>
+</div>
+
 <div id="door" aria-hidden="true">
   <div class="door-half door-l"><div class="door-band"></div></div>
   <div class="door-half door-r"><div class="door-band"></div></div>
 </div>
 
+<!-- わいわいタウンのSDK（セーブ保全＋全国ランキング）。**crossorigin を省かないこと**
+     ＝COEP下で黙ってブロックされる。読めなくても動くよう、ゲーム側は window.waiwai の
+     不在を織り込んである（Claude Artifact 版は CSP で読めない）。 -->
+<script src="https://waiwai.town/sdk.js" crossorigin="anonymous"></script>
 <script src="chars.js"></script>
 <script src="game.js"></script>
 </body>

@@ -67,7 +67,10 @@ if (missing.length) console.log(`  ※ 未収録のボイス: ${missing.join(", 
 const page = read("src/page.html");
 const style = page.match(/<style>([\s\S]*?)<\/style>/)[1];
 // <body> の中身（タイトル札・帳・canvas）をそのまま持ってくる。script タグは除く
-const body = page.match(/<body>([\s\S]*?)<script/)[1].trim();
+// HTMLコメントは落とす。ビルドの手順を説明した注（わいわいSDKの読み込みなど）は
+// 単一ファイル版には要らず、しかも**そこで参照している script 自体はここに入らない**ので、
+// 残すと存在しないものの説明になる。
+const body = page.match(/<body>([\s\S]*?)<script/)[1].replace(/<!--[\s\S]*?-->\s*/g, "").trim();
 
 const html = `<meta charset="utf-8">
 <title>月影とび</title>

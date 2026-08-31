@@ -43,6 +43,45 @@
   /* ================= 帳（とばり）=================
      開幕に左右へ開く黒緞子の扉。式札かさねの意匠をそのまま持ってきている
      （合わせ目に金襴の帯を通す） */
+  /* ---- 番付（わいわいタウンの全国ランキング） ---- */
+  /* 結果の札は canvas に描いているが、番付は他人の名前が並ぶ一覧なので DOM で持つ
+     （canvas に流し込むと、指で送れない・読み上げに乗らない・名前の長さで崩れる）。 */
+  #banzuke{position:fixed;inset:0;display:none;align-items:center;justify-content:center;
+    background:rgba(10,10,24,.78);z-index:26;}
+  #banzuke.show{display:flex;}
+  .bz-card{position:relative;background:linear-gradient(170deg,rgba(28,24,54,.93),rgba(19,16,38,.95));
+    border:1px solid #b89b5a;box-shadow:0 0 0 3px rgba(19,16,38,.9),0 0 0 4px var(--line),0 14px 50px rgba(0,0,0,.65);
+    border-radius:10px;padding:24px 22px 22px;text-align:center;display:flex;flex-direction:column;gap:12px;
+    width:min(92vw,340px);box-sizing:border-box;}
+  #bz-close{position:absolute;top:10px;right:12px;width:32px;height:32px;font-family:inherit;font-size:14px;
+    color:var(--ink-dim);background:transparent;border:1px solid var(--line);border-radius:5px;cursor:pointer;}
+  #bz-close:focus-visible{outline:2px solid var(--moon);outline-offset:2px;}
+  #bz-head{font-size:16px;font-weight:800;letter-spacing:.34em;color:var(--moon);}
+  #bz-sub{font-size:12px;letter-spacing:.12em;color:var(--ink-dim);margin-top:-8px;}
+  #bz-sub em{font-style:normal;font-weight:800;color:var(--kindei);}
+  #bz-list,#bz-me{list-style:none;display:flex;flex-direction:column;gap:3px;}
+  /* 背の低い画面のときだけ効く安全弁。body の touch-action を打ち消さないと指で送れない */
+  #bz-list{max-height:58vh;overflow-y:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch;}
+  .bz-row{display:flex;align-items:baseline;gap:10px;padding:7px 10px;border:1px solid transparent;
+    border-radius:5px;background:rgba(232,228,216,.05);text-align:left;}
+  .bz-rank{flex:0 0 2.1em;text-align:right;font-size:13px;font-weight:800;letter-spacing:.04em;color:var(--ink-dim);}
+  .bz-row.top .bz-rank{color:var(--moon);}
+  .bz-name{flex:1 1 auto;min-width:0;font-size:14px;color:var(--ink);
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .bz-score{flex:0 0 auto;font-family:"M PLUS Rounded 1c","Hiragino Sans",sans-serif;font-size:15px;
+    font-weight:800;color:var(--kindei);font-variant-numeric:tabular-nums;}
+  /* 会心の連は段のあとに小さく添える（段が主・連が従の一軸をそのまま画に写す） */
+  .bz-score small{font-size:12px;font-weight:500;color:var(--ink-dim);margin-left:3px;}
+  /* 自分の行は金泥の縁で見分ける（上位に居ればその行に・居なければ下に1行足す） */
+  .bz-row.me{border-color:var(--kindei);background:rgba(217,169,76,.12);}
+  .bz-row.me .bz-name{color:var(--moon);}
+  /* 地が金泥寄りに温まるぶん、順位の数字も --ink-dim ではなく --moon にする
+     （明るい地の上で --ink-dim は読みの床4.5を割る。御霊おとしで実測） */
+  .bz-row.me .bz-rank{color:var(--moon);}
+  .bz-row.me .bz-score small{color:var(--ink);}
+  #bz-gap{font-size:13px;line-height:1;letter-spacing:.3em;color:var(--ink-dim);margin:-4px 0;}
+  #bz-gap[hidden],#bz-me[hidden]{display:none;}
+
   #door{position:fixed;inset:0;display:none;z-index:25;pointer-events:none;overflow:hidden;}
   #door.show{display:block;}
   .door-half{
@@ -104,21 +143,21 @@
     filter:drop-shadow(0 0 14px rgba(240,206,126,.30)) drop-shadow(0 2px 6px rgba(0,0,0,.55));
     text-wrap:balance;cursor:pointer;
   }
-  .game-sub{font-size:10px;letter-spacing:.15em;color:var(--ink-dim);margin-top:-6px;}
-  #best-title{font-size:10px;letter-spacing:.14em;color:var(--ink-dim);margin-top:-4px;}
+  .game-sub{font-size:12px;letter-spacing:.15em;color:var(--ink-dim);margin-top:-6px;}
+  #best-title{font-size:12px;letter-spacing:.14em;color:var(--ink-dim);margin-top:-4px;}
   #best-title em{font-style:normal;color:var(--moon);}
   .story{font-size:12px;line-height:1.9;letter-spacing:.06em;color:var(--ink);text-align:center;}
   .howto{list-style:none;display:flex;flex-direction:column;gap:8px;font-size:13px;line-height:1.6;color:var(--ink);text-align:left;}
   .howto li::before{content:"〇 ";color:var(--kindei);}
   #start{
     font-family:inherit;font-size:15px;font-weight:700;letter-spacing:.25em;
-    color:var(--night);background:var(--moon);border:none;border-radius:6px;padding:14px 30px;cursor:pointer;
+    color:var(--night);background:var(--moon);border:none;border-radius:5px;padding:14px 30px;cursor:pointer;
   }
   #start:focus-visible{outline:3px solid var(--moon);outline-offset:2px;}
-  .sound-note{font-size:10px;letter-spacing:.1em;color:var(--ink-dim);margin-top:-6px;}
+  .sound-note{font-size:12px;letter-spacing:.1em;color:var(--ink-dim);margin-top:-6px;}
   #start-silent{
     font-family:inherit;font-size:12px;letter-spacing:.15em;color:var(--ink-dim);
-    background:transparent;border:1px solid var(--line);border-radius:6px;padding:9px 18px;cursor:pointer;
+    background:transparent;border:1px solid var(--line);border-radius:5px;padding:9px 18px;cursor:pointer;
   }
   #start-silent:focus-visible{outline:2px solid var(--moon);outline-offset:2px;}
 </style>
@@ -146,11 +185,26 @@
   </div>
 </div>
 
+<div id="banzuke" role="dialog" aria-label="番付">
+  <div class="bz-card">
+    <button id="bz-close" aria-label="番付を閉じる">✕</button>
+    <div id="bz-head">番付</div>
+    <div id="bz-sub" hidden></div>
+    <ol id="bz-list"></ol>
+    <div id="bz-gap" aria-hidden="true" hidden>⋮</div>
+    <ol id="bz-me" hidden></ol>
+  </div>
+</div>
+
 <div id="door" aria-hidden="true">
   <div class="door-half door-l"><div class="door-band"></div></div>
   <div class="door-half door-r"><div class="door-band"></div></div>
 </div>
 
+<!-- わいわいタウンのSDK（セーブ保全＋全国ランキング）。**crossorigin を省かないこと**
+     ＝COEP下で黙ってブロックされる。読めなくても動くよう、ゲーム側は window.waiwai の
+     不在を織り込んである（Claude Artifact 版は CSP で読めない）。 -->
+<script src="https://waiwai.town/sdk.js" crossorigin="anonymous"></script>
 <script>
 // generated by scripts/build-chars.py — do not edit
 // 公式ちびシート(2頭身)の正面立ち絵を切り出し、高さ150pxに縮めて透過WebPにしたもの
@@ -327,10 +381,156 @@ const ICON = {
   }
 
   // ---- 保存（iframe内で例外になる環境があるので必ず try/catch）----
-  function load(k, d) { try { var v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } }
-  function save(k, v) { try { localStorage.setItem(k, v); } catch (e) { } }
-  var best = parseInt(load("tsukikage_best", "0"), 10) || 0;
-  var bestCombo = parseInt(load("tsukikage_best_combo", "0"), 10) || 0;
+  // ---- 記録（わいわいSDK・セーブ保全） ----
+  // 第三者iframe（わいわいタウンのサイト内プレイ）ではゲーム自身の localStorage が保持されない。
+  // 御霊おとしで iPhone の Safari・Chrome の両方に実害を確認している（枠の中から遊ぶと
+  // アプリ終了で最高記録がゼロに戻る／Pages を直に開くと残る）。わいわいSDK の save/load は
+  // 親ページ側へ代理保存するので主経路にし、SDK が無い・読めない・応答しないときは
+  // 今までどおりこのページの localStorage を直に使う（Artifact 版は CSP で sdk.js が読めない
+  // ＝window.waiwai がそもそも無い）。仕様の正本: https://waiwai.town/llms.txt
+  var SAVE_KEY = "tsukikage_save";
+  var SAVE_TIMEOUT_MS = 2500;   // 相手を待ちすぎない（SDK自身は握手2秒＋要求5秒待つ）
+  var LEGACY_KEYS = { best: "tsukikage_best", bestCombo: "tsukikage_best_combo" };
+  var TIMED_OUT = {};           // Promise.race の勝者が「時間切れ」であることの印
+
+  // 記録の上限。本作は**エンドレスで段に天井が無い**が、桁の守りとして 999 を上限に置く
+  // （番付の合成値 `段×1000+会心` と同じ budget）。到達率は 40段6%・60段3%、設計上の
+  // 想定は20〜30段なので、人がここへ届くことは無い。**超えた値は丸めずに捨てる**——
+  // 丸めると壊れた値が最上位の誉れに化ける（式札かさね 2026-08-30 検品指摘）。
+  var SANE_MAX = 999;
+
+  var best = 0, bestCombo = 0;  // 実際の値は saveLoaded の後に入る（waiwai.load は非同期）
+  var saveResolve;
+  var saveLoaded = new Promise(function (res) { saveResolve = res; });
+  var saveUseSdk = false;       // わいわい側の記録を読めた夜だけ true
+                                // （読めていないのに書くと、向こうの記録を低い値で潰す）
+
+  // わいわいSDK の呼び出しの芯。例外・拒否・無応答のどれでも { ok:false } を返し、
+  // 握りつぶさず warn は残す（「CSPで止まったのに静かに落ちていた」の轍を踏まない）。
+  function waiwaiTry(fn, label, ms) {
+    var call;
+    try {
+      call = fn();
+    } catch (e) {
+      console.warn("[waiwai] " + label + " を呼べなかった", e);
+      return Promise.resolve({ ok: false });
+    }
+    var timeout = new Promise(function (res) { setTimeout(function () { res(TIMED_OUT); }, ms); });
+    return Promise.race([Promise.resolve(call), timeout]).then(
+      function (v) {
+        if (v === TIMED_OUT) {
+          console.warn("[waiwai] " + label + " が " + ms + "ms 以内に返らなかった");
+          return { ok: false };
+        }
+        return { ok: true, value: v };
+      },
+      function (e) {
+        console.warn("[waiwai] " + label + " が失敗した", e);
+        return { ok: false };
+      }
+    );
+  }
+
+  // 記録を束へ取り込む。**「読み取れた欄の数」を返す**（-1 は「そもそも記録の形をしていない」）。
+  // 呼び出し側はこれを見て「読めたのか・読めなかったのか」を判断する。0 と -1 を「初回だ」と
+  // 読み違えると、**空の値で向こうの記録を上書きする**（式札かさね 2026-08-30 検品指摘）。
+  // 段も会心連も増える一方なので、どの経路から読んでも大きいほうを採る
+  // ＝片方が古くても記録が後退しない（移行と自己修復を同じ規則で兼ねる）。
+  function mergeSave(o) {
+    if (!o || typeof o !== "object") return -1;
+    var read = 0;
+    var sane = function (v) {
+      if (typeof v !== "number" || !isFinite(v)) return null;
+      var n = Math.floor(v);
+      return n >= 0 && n <= SANE_MAX ? n : null;   // 範囲の外は壊れている
+    };
+    var b = sane(o.best);
+    if (b !== null) { read++; best = Math.max(best, b); }
+    var c = sane(o.bestCombo);
+    if (c !== null) { read++; bestCombo = Math.max(bestCombo, c); }
+    return read;
+  }
+
+  // 旧キー（このページ自身の localStorage）。移行元であり、SDK が使えない夜の置き場でもある。
+  function readLegacy() {
+    var d = {};
+    try {
+      var rb = localStorage.getItem(LEGACY_KEYS.best);
+      var rc = localStorage.getItem(LEGACY_KEYS.bestCombo);
+      d.__found = rb !== null || rc !== null;
+      if (rb !== null) d.best = +rb;
+      if (rc !== null) d.bestCombo = +rc;
+    } catch (e) {
+      console.warn("[save] localStorage を読めなかった", e);
+    }
+    return d;
+  }
+  function writeLegacy() {
+    try {
+      localStorage.setItem(LEGACY_KEYS.best, String(best));
+      localStorage.setItem(LEGACY_KEYS.bestCombo, String(bestCombo));
+    } catch (e) {
+      console.warn("[save] localStorage へ書けなかった", e);
+    }
+  }
+  function dropLegacy() {
+    // 公式の推奨手順「旧キーを読む → waiwai.save で書く → 旧キーを消す」の最後の一歩。
+    // **save が成功したときだけ**呼ぶ（先に消すと、書けなかったときに記録が消える）。
+    try {
+      localStorage.removeItem(LEGACY_KEYS.best);
+      localStorage.removeItem(LEGACY_KEYS.bestCombo);
+    } catch (e) { }
+  }
+
+  // 記録を書く。呼び出し側は await しない（画面を待たせない）。
+  function persistSave() {
+    return saveLoaded.then(function () {
+      if (!saveUseSdk) { writeLegacy(); return false; }
+      return waiwaiTry(
+        function () { return window.waiwai.save(SAVE_KEY, { best: best, bestCombo: bestCombo }); },
+        "save(" + SAVE_KEY + ")",
+        SAVE_TIMEOUT_MS
+      ).then(function (r) {
+        if (!r.ok) writeLegacy();   // 書けなかった夜も、せめてこのブラウザには残す
+        return r.ok;
+      });
+    }).catch(function (e) {
+      console.warn("[save] 書き込みでつまずいた", e);
+      return false;
+    });
+  }
+
+  (function loadSave() {
+    var legacy = readLegacy();
+    if (!window.waiwai) {
+      console.warn("[save] わいわいSDK が読めていないので、このページの localStorage を直に使う");
+      mergeSave(legacy);
+      saveResolve();
+      return;
+    }
+    waiwaiTry(function () { return window.waiwai.load(SAVE_KEY); }, "load(" + SAVE_KEY + ")", SAVE_TIMEOUT_MS)
+      .then(function (r) {
+        if (!r.ok) {
+          // 読めていない状態で書くと、向こうにある記録を低い値で潰しかねない。この夜は書かない。
+          console.warn("[save] わいわい側の記録を読めなかった。この夜は localStorage だけを使う");
+          mergeSave(legacy);
+          saveResolve();
+          return;
+        }
+        mergeSave(legacy);   // 旧キー（移行元）
+        // r.value が null なら「まだ記録が無い」＝初回。非nullなのに1欄も読み取れなかったときは
+        // **形が違う＝読めていない**とみなし、時間切れと同じ扱いにする（この夜は書かない）。
+        var read = (r.value === null || r.value === undefined) ? 0 : mergeSave(r.value);
+        if (read <= 0 && r.value !== null && r.value !== undefined) {
+          console.warn("[save] わいわい側の記録が読み取れない形だった。この夜は localStorage だけを使う", r.value);
+          saveResolve();
+          return;
+        }
+        saveUseSdk = true;
+        saveResolve();
+        if (legacy.__found) persistSave().then(function (ok) { if (ok) dropLegacy(); });
+      });
+  })();
 
   // ---- デバッグハッシュ（最初のコミットから仕込む＝既存2作の教訓）----
   var bootAt = performance.now();   // #autowobble: 外部の録画ツールがCDPスクリーンキャストを
@@ -346,6 +546,21 @@ const ICON = {
     wx: (hash.match(/wx(\d)/) || [])[1]        // 天候を固定する（0=月夜 1=追い風 2=雨）
   };
   var statLog = [];
+
+  // ---- 記録・番付に載せてよい夜かの判定（1か所に集約する） ----
+  // 自動プレイ（#autoperfect / #automiss / #autoskip / #autowobble）は**試しモードではなく
+  // 本番ルールで動く**。`begin()` を直に呼ぶだけで testMode を立てないため、塞がないと
+  // 検証やPV撮影のたびに記録が書かれる。
+  // 本作が式札かさねより深刻なのは、**エンドレスで #autoperfect に終わりが無い**こと。
+  // あちらは80段が上限で理論最大 8080 に頭打ちだったが、こちらは次の台座を正確に狙い続ける
+  // だけなので**段は青天井**——そのまま番付へ載せると、人が二度と抜けない記録になる。
+  var AUTO_PLAY = DBG.autoperfect || DBG.automiss || DBG.autoskip || DBG.autowobble;
+  function canRecord(s) { return !s.test && !AUTO_PLAY; }
+  // 番付へ送ってよい夜か。記録に残せる夜であることに加えて**桁の守り**を通す
+  // （合成値 `段×1000+会心` が壊れないこと。SANE_MAX の根拠は記録の節を見よ）。
+  function canSubmitScore(s) {
+    return canRecord(s) && s.step >= 0 && s.step <= SANE_MAX && s.maxCombo <= SANE_MAX;
+  }
 
   // ---- 画面の拡縮（dpr対応）----
   function resize() {
@@ -392,7 +607,188 @@ const ICON = {
     if (typeof CANON !== "undefined" && CANON[id]) { var cn = new Image(); cn.src = CANON[id]; canons[id] = cn; }
   });
 
+  // ---- わいわいタウン 全国ランキング・番付（あってもなくても遊びは変わらない） ----
+  // SDK は page.html の外部スクリプトで読む。タウンの中（iframe）＝全国ランキングに載る／
+  // タウンの外（GitHub Pages 等）＝SDK がこのブラウザだけの自己ベスト保持に自動で落ちる／
+  // CSP で読めない（Claude Artifact）＝window.waiwai がそもそも無い。
+  // **どの場合も結果の札は今までどおり出る**のが最優先。
+  //
+  // 送るスコアは合成値 `到達段 * 1000 + 会心の連なり`（2026-08-31 企画裁定）。
+  // 本作の記録は2軸だが getTopScores は meta を返さないので、番付に連を出すには合成値が要る。
+  // 桁が式札かさね（段*100+浄化）と違うのは、**あちらは段に80の天井があった**から。
+  // 本作はエンドレスで天井が無く、会心の連 <= 段 という関係しかないため、段が100を超えると
+  // *100 では桁があふれる。到達率は 40段6%・60段3%、設計上の想定は20〜30段なので、
+  // 人が SANE_MAX(999) へ届くことは無い。番付の行は score から段と連を復元して出す。
+  var RANK_BOARD = "main";
+  var RANK_TIMEOUT_MS = 2500;   // SDK自身は握手2秒＋要求5秒待つ。結果の札を付き合わせない
+  var BANZUKE_LIMIT = 10;       // 番付に載せる上位の人数
+  var RANK_SCALE = 1000;        // 合成スコアの桁（段 * RANK_SCALE + 会心の連）
+  var nightId = 0;              // 「もう一夜」ごとに増える。応答が返ったとき、まだ同じ夜かを見る印
+
+  function composeScore(step, combo) {
+    return step * RANK_SCALE + Math.min(combo, RANK_SCALE - 1);
+  }
+  var MAX_SCORE = composeScore(SANE_MAX, SANE_MAX);   // 999999
+  function rankNum(v) { return (typeof v === "number" && isFinite(v) && v > 0) ? Math.floor(v) : null; }
+  function scoreNum(v) { return (typeof v === "number" && isFinite(v) && v >= 0) ? Math.floor(v) : null; }
+
+  // 呼び出しは必ずここを通す。例外・拒否・無応答のどれでも null を返し、握りつぶさず warn は残す。
+  function waiwaiCall(fn, label) {
+    if (!window.waiwai) return Promise.resolve(null);
+    return waiwaiTry(fn, label, RANK_TIMEOUT_MS).then(function (r) { return r.ok ? r.value : null; });
+  }
+
+  var bzEls = {
+    box: document.getElementById("banzuke"),
+    close: document.getElementById("bz-close"),
+    sub: document.getElementById("bz-sub"),
+    list: document.getElementById("bz-list"),
+    gap: document.getElementById("bz-gap"),
+    me: document.getElementById("bz-me")
+  };
+  var banzuke = { entries: null, total: null, myRank: null, myScore: null };
+  // 結果の札は canvas なので、順位の行は「描く文」と「押せる矩形」を控えて drawResult が使う。
+  var rankUI = { line: "", improved: false, hit: null, canOpen: false };
+
+  // 相手の応答は他人が入れた名前を含むので、必ず textContent で置く（innerHTML を使わない）。
+  // 形が崩れている項目は静かに捨てる（1件も残らなければ entries は null ＝入口を出さない）。
+  function normalizeEntries(list) {
+    if (!Array.isArray(list)) return null;
+    var out = [];
+    for (var i = 0; i < list.length; i++) {
+      var e = list[i];
+      if (!e || typeof e !== "object") continue;
+      var rank = rankNum(e.rank), score = scoreNum(e.score);
+      // 合成スコアの上限を超える値は正しい遊びからは出ないので載せない
+      // （丸めると、この遊びに無い段が番付に並ぶ）。
+      if (rank === null || score === null || score > MAX_SCORE) continue;
+      var raw = typeof e.name === "string" ? e.name.trim() : "";
+      out.push({ rank: rank, name: (raw || "ナナシ").slice(0, 20), score: score });
+      if (out.length >= BANZUKE_LIMIT) break;
+    }
+    out.sort(function (a, b) { return a.rank - b.rank; });
+    return out.length ? out : null;
+  }
+
+  function bzRow(rank, name, score, isMe) {
+    var li = document.createElement("li");
+    li.className = "bz-row" + (rank <= 3 ? " top" : "") + (isMe ? " me" : "");
+    if (isMe) li.setAttribute("aria-current", "true");
+    var r = document.createElement("span"); r.className = "bz-rank"; r.textContent = rank;
+    var n = document.createElement("span"); n.className = "bz-name"; n.textContent = name;
+    var sc = document.createElement("span"); sc.className = "bz-score";
+    sc.textContent = Math.floor(score / RANK_SCALE) + "段";
+    var sm = document.createElement("small");
+    sm.textContent = "（会心" + (score % RANK_SCALE) + "連）";
+    sc.appendChild(sm);
+    li.appendChild(r); li.appendChild(n); li.appendChild(sc);
+    return li;
+  }
+
+  function renderBanzuke() {
+    var rows = banzuke.entries || [];
+    bzEls.list.textContent = "";
+    var inList = banzuke.myRank !== null && rows.some(function (e) { return e.rank === banzuke.myRank; });
+    for (var i = 0; i < rows.length; i++) {
+      bzEls.list.appendChild(bzRow(rows[i].rank, rows[i].name, rows[i].score, rows[i].rank === banzuke.myRank));
+    }
+    // 上位に居ない夜だけ、間を空けて自分の行を下に足す（居るときは二重に出さない）
+    bzEls.me.textContent = "";
+    var showMe = !inList && banzuke.myRank !== null && banzuke.myScore !== null;
+    if (showMe) bzEls.me.appendChild(bzRow(banzuke.myRank, "あなた", banzuke.myScore, true));
+    bzEls.me.hidden = !showMe;
+    bzEls.gap.hidden = !showMe;
+    // 総数が自分の順位より小さいのは辻褄が合っていない。片方だけ残ると
+    // 「全国5人」の中の「12位」になるので、見出しごと出さない。
+    var totalOk = banzuke.total !== null && (banzuke.myRank === null || banzuke.total >= banzuke.myRank);
+    if (totalOk) {
+      bzEls.sub.textContent = "";
+      bzEls.sub.appendChild(document.createTextNode("全国 "));
+      var em = document.createElement("em"); em.textContent = banzuke.total;
+      bzEls.sub.appendChild(em);
+      bzEls.sub.appendChild(document.createTextNode("人"));
+      bzEls.sub.hidden = false;
+    } else {
+      bzEls.sub.hidden = true;
+    }
+  }
+
+  function bzOpen() { return bzEls.box.classList.contains("show"); }
+  function openBanzuke() {
+    if (!banzuke.entries) return;   // 控えが無いのに開かない（入口も出ていないはずだが念のため）
+    renderBanzuke();
+    bzEls.box.classList.add("show");
+  }
+  function closeBanzuke() { bzEls.box.classList.remove("show"); }
+  bzEls.close.addEventListener("click", closeBanzuke);
+  bzEls.box.addEventListener("click", function (e) { if (e.target === bzEls.box) closeBanzuke(); });
+
+  function clearRankUI() {
+    rankUI.line = ""; rankUI.improved = false; rankUI.hit = null; rankUI.canOpen = false;
+    banzuke.entries = null; banzuke.total = null; banzuke.myRank = null; banzuke.myScore = null;
+    closeBanzuke();
+  }
+
+  // 取れたものだけ出す。取れなかった行は出さない（「取得できませんでした」も出さない）
+  function showRankUI(rank, total, improved, entries, myScore) {
+    rankUI.improved = improved;
+    if (rank !== null) {
+      rankUI.line = "全国 " + rank + " 位" + (total !== null && total >= rank ? " ／ " + total + "人中" : "");
+      // 上位の顔ぶれまで取れた夜だけ、押して番付を開ける。取れていなければ入口ごと存在しない。
+      rankUI.canOpen = entries !== null;
+      if (rankUI.canOpen) {
+        banzuke.entries = entries; banzuke.total = total;
+        banzuke.myRank = rank; banzuke.myScore = myScore;
+      }
+    }
+  }
+
+  // 応答の形（御霊おとしが2026-08-29に sdk.js と親側 static/play-score.js の実装で確認）:
+  //   submitScore  タウン内 { ok, best, rank, improved } / タウン外 { ok, best, local:true, improved }
+  //   getTopScores タウン内 { entries, total }           / タウン外 { entries, local:true }（total なし）
+  //   getMyScore   タウン外 { best, local:true } または null
+  // 順位は submitScore の rank を正本にする。getMyScore は rank が取れなかったときの保険。
+  function reportScore(sentScore, myNight) {
+    if (!window.waiwai) {
+      // 画面には何も出さないが、記録には残す。「静かに失敗して誰も気づかない」を作らないため
+      console.warn("[waiwai] SDK が読めていないので全国順位は出さない（Artifact の CSP・読み込み失敗など）");
+      return Promise.resolve();
+    }
+    return waiwaiCall(function () { return window.waiwai.submitScore(RANK_BOARD, sentScore); }, "submitScore")
+      .then(function (res) {
+        if (nightId !== myNight) return;   // もう次の夜が始まっている
+        if (!res) return;                  // 送れていない＝順位も総数も名乗らない
+        var rank = rankNum(res.rank);
+        var improved = res.improved === true;
+        var step1 = (rank === null && !res.local)
+          ? waiwaiCall(function () { return window.waiwai.getMyScore(RANK_BOARD); }, "getMyScore")
+              .then(function (mine) { if (mine) rank = rankNum(mine.rank); })
+          : Promise.resolve();
+        return step1.then(function () {
+          if (nightId !== myNight) return;
+          if (rank === null) { showRankUI(null, null, improved, null, null); return; }
+          // 総数と顔ぶれは同じ1回で取る（押してから取りにいかない＝開くのを待たせない）
+          return waiwaiCall(function () { return window.waiwai.getTopScores(RANK_BOARD, BANZUKE_LIMIT); }, "getTopScores")
+            .then(function (top) {
+              if (nightId !== myNight) return;
+              var total = null, entries = null;
+              if (top) {
+                total = rankNum(top.total);
+                entries = normalizeEntries(top.entries);
+                if (entries === null) console.warn("[waiwai] 上位の顔ぶれが読めなかったので番付への入口は出さない");
+              }
+              // 順位は自己ベストに対して付くので、自分の行の点も応答が返した best を優先する
+              var myScore = scoreNum(res.best) !== null ? scoreNum(res.best) : scoreNum(sentScore);
+              showRankUI(rank, total, improved, entries, myScore);
+            });
+        });
+      });
+  }
+
   // ---- 音（Pages版は別ファイル、Artifact版は AUDIO_DATA に差し替わる）----
+  // 音を解けなかったときは**必ず warn を残す**。空の関数で握り潰すと、合成音や無音へ
+  // 静かに落ちて誰も気づかない（御霊おとしは2026-08-26に、式札かさねは2026-08-30に修正済みで、
+  // 本作だけ古い形が残っていた）。
   // 鳴らす効果音の一覧。**ここが正本**で、読み込みも Artifact 版の埋め込み
   // （scripts/build-artifact.js）も、この配列を見る。手で二重管理しない
   // （リストのずれで Artifact だけ無音になった 2026-08-26 の事故の再発防止）。
@@ -424,11 +820,13 @@ const ICON = {
     SE_NAMES.forEach(function (n) {
       // Artifact版は CSP で fetch(data:) が全滅するため、埋め込みは atob 経由で読む（既存2作の教訓）
       if (window.AUDIO_DATA && window.AUDIO_DATA[n]) {
-        a.decodeAudioData(b64ToBuf(window.AUDIO_DATA[n]), function (buf) { seBuf[n] = buf; }, function () { });
+        a.decodeAudioData(b64ToBuf(window.AUDIO_DATA[n]), function (buf) { seBuf[n] = buf; },
+          function (e) { console.warn("[音] 効果音 " + n + " を解けなかった", e); });
         return;
       }
       fetch("assets/audio/" + n + ".m4a").then(function (r) { return r.arrayBuffer(); })
-        .then(function (ab) { a.decodeAudioData(ab, function (buf) { seBuf[n] = buf; }, function () { }); })
+        .then(function (ab) { a.decodeAudioData(ab, function (buf) { seBuf[n] = buf; },
+          function (e) { console.warn("[音] 効果音 " + n + " を解けなかった", e); }); })
         .catch(function () { });
     });
   }
@@ -448,7 +846,8 @@ const ICON = {
   function loadVoice() {
     var a = audioCtx(); if (!a) return;
     VOICE_KEYS.forEach(function (k) {
-      var got = function (ab) { a.decodeAudioData(ab, function (b) { voiceBuf[k] = b; }, function () { }); };
+      var got = function (ab) { a.decodeAudioData(ab, function (b) { voiceBuf[k] = b; },
+        function (e) { console.warn("[音] 台詞 " + k + " を解けなかった", e); }); };
       if (window.VOICE_DATA && window.VOICE_DATA[k]) { got(b64ToBuf(window.VOICE_DATA[k])); return; }
       fetch("assets/voice/shiori_" + k + ".m4a").then(function (r) {
         if (!r.ok) throw 0; return r.arrayBuffer();
@@ -515,7 +914,8 @@ const ICON = {
         } catch (e) { }
       };
       if (bgmBuf) { play(bgmBuf); return; }
-      a.decodeAudioData(b64ToBuf(window.BGM_DATA), play, function () { });
+      a.decodeAudioData(b64ToBuf(window.BGM_DATA), play,
+        function (e) { console.warn("[音] BGM を解けなかった", e); });
       return;
     }
     try {
@@ -920,9 +1320,21 @@ const ICON = {
   function gameOver() {
     var s = state;
     s.phase = "result";
-    if (!s.test) {   // 試しモードの記録は残さない（BESTを汚さない）
-      if (s.step > best) { best = s.step; save("tsukikage_best", String(best)); s.newBest = true; }
-      if (s.maxCombo > bestCombo) { bestCombo = s.maxCombo; save("tsukikage_best_combo", String(bestCombo)); s.newBestCombo = true; }
+    clearRankUI();   // 前の夜の順位を残さない
+    if (canRecord(s)) {   // 試しモード・自動プレイの記録は残さない（BESTを汚さない）
+      var grew = false;
+      if (s.step > best) { best = s.step; s.newBest = true; grew = true; }
+      if (s.maxCombo > bestCombo) { bestCombo = s.maxCombo; s.newBestCombo = true; grew = true; }
+      // 書くのは夜の終わりの1回だけ（本作は元からこの形なので、式札かさねが要った
+      // visibilitychange/pagehide の取りこぼし対策は要らない）。await しない＝画面を待たせない。
+      if (grew) persistSave();
+    }
+    // 記録を確定したあとに送る。await しない＝結果の札も「もう一夜」も待たせない
+    if (canSubmitScore(s)) {
+      reportScore(composeScore(s.step, s.maxCombo), nightId).catch(function (e) {
+        // ここに落ちるのは想定外（waiwaiCall は reject しない）。unhandledrejection にはしない
+        console.warn("[waiwai] 順位の表示でつまずいた", e);
+      });
     }
     se("end", 0.8);
     setTimeout(function () { voice(resultVoiceKey(s.step)); }, 420);
@@ -993,6 +1405,12 @@ const ICON = {
 
   // ---- 入力 ----
   var lastPointer = { x: 0, y: 0 };
+  // 順位の行の押し所。drawResult が実際に描いた矩形を控えておき、それで判定する
+  // （描いた場所と押せる場所を別々に持つと、片方だけ直したときにずれる）。
+  function hitRank(x, y) {
+    var r = rankUI.hit;
+    return !!r && x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h;
+  }
   function down(e) {
     if (e.cancelable) e.preventDefault();
     if (typeof e.clientX === "number") {
@@ -1004,10 +1422,18 @@ const ICON = {
     if (now < lockUntil) return;
     audioCtx();
     var s = state;
+    if (bzOpen()) return;              // 番付を開いている間は、下の札に触らせない
     if (s.phase === "title") return;   // タイトルはDOMの札が受ける
     if (s.phase === "play" && hitTestBar(lastPointer.x, lastPointer.y)) return;   // 試しのボタン
     // reset() は state を作り直すので、phase は必ず新しい state 側に立てる（古い s に書くと始まらない）
-    if (s.phase === "result") { reset(); state.phase = "play"; return; }
+    if (s.phase === "result") {
+      // 順位の行を押したときは番付を開く（「もう一夜」より先に見る）。
+      // 結果画面はどこを押しても next の夜へ行くので、**この判定を必ず先に置く**。
+      if (rankUI.canOpen && hitRank(lastPointer.x, lastPointer.y)) { openBanzuke(); return; }
+      nightId++;   // 遅れて返る応答を、次の夜の画面に出さないための印
+      clearRankUI();
+      reset(); state.phase = "play"; return;
+    }
     if (s.phase === "play" && !s.jump) { s.charging = true; s.chargeStart = now; }
   }
   function up(e) {
@@ -1497,6 +1923,33 @@ const ICON = {
       textLS("試し（記録は残りません）", W / 2, cy0 + 276, 1.6, "center");
     }
 
+    // 全国順位（取れた夜だけ）。札の下、「もう一夜」との間に置く。
+    // 押し所は 24px 以上を確保する（設えの正典の床）。押せるのは番付の顔ぶれまで
+    // 取れた夜だけで、取れていなければ行は出しても囲みは出さない＝入口ごと存在しない。
+    // 文字の大きさは **canvas の指定ではなく実寸で決める**。この canvas は内部 480px を
+    // min(100vw, 100vh*0.6667) へ縮めて出すので、375×667 の端末では 0.781 倍になる
+    // ＝12px 指定は実寸 9.4px で、設えの正典の床（12px）を割る。
+    // 床を満たすには 16px 指定が要る（16 × 0.768 = 12.3px。いちばん狭い 375×553 でも足りる）。
+    rankUI.hit = null;
+    var ry = 514;
+    if (rankUI.improved) {
+      ctx.font = "700 16px " + MINCHO; ctx.fillStyle = C.kindei;
+      textLS("さいこうきろくを こうしん", W / 2, ry, 2.0, "center");
+      ry += 30;
+    }
+    if (rankUI.line) {
+      ctx.font = "700 16px " + MINCHO;
+      var rw = ctx.measureText(rankUI.line) .width + (rankUI.canOpen ? 46 : 24);
+      // 押し所は実寸 24px 以上（正典の床）。0.768 倍で縮むので canvas 側は 32px 以上要る
+      var rh = 34, rx = W / 2 - rw / 2, rt = ry - 23;
+      if (rankUI.canOpen) {
+        panel(rx, rt, rw, rh, 5);
+        rankUI.hit = { x: rx, y: rt, w: rw, h: rh };
+      }
+      ctx.font = "700 16px " + MINCHO; ctx.fillStyle = C.ink;
+      textLS(rankUI.line + (rankUI.canOpen ? "  ›" : ""), W / 2, ry, 1.6, "center");
+    }
+
     ctx.globalAlpha = 0.55 + Math.sin(performance.now() / 380) * 0.35;
     ctx.font = "700 15px " + MINCHO; ctx.fillStyle = C.ink;
     textLS("もう一夜", W / 2, 596, 3.2, "center");
@@ -1626,11 +2079,14 @@ const ICON = {
     im.onerror = function () { overlay.classList.add("ready"); };
     im.src = titleArt;
 
-    if (best > 0) {
+    // 誉れ行は**記録を読み終えてから**出す。先に描くと、わいわいの枠の中で
+    // 「0段」を一瞬見せてから差し替わる（式札かさねと同じ作法）。
+    saveLoaded.then(function () {
+      if (testMode || best <= 0) return;
       var el = document.getElementById("best-title");
       el.hidden = false;
       el.innerHTML = bestLine();
-    }
+    });
   }
   // タイトルの誉れ行。**段と会心連の2軸**を出す（連を保存だけして表示していなかった
   // ＝貼れる数字が1軸に痩せていた、の是正。2026-08-26 レビュー指摘）。

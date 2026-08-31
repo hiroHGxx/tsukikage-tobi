@@ -13,7 +13,10 @@ const game = read("src/game.js");
 html = html.replace('<script src="chars.js"></script>', `<script>\n${chars}\n</script>`);
 html = html.replace('<script src="game.js"></script>', `<script>\n${game}\n</script>`);
 
-if (html.includes("<script src=")) { console.error("インライン化できていない script が残っています"); process.exit(1); }
+// 見張り: **手元の** script が畳めずに残っていないか。外部URL（わいわいSDK）は
+// 意図して外に置いたままなので除く（Pagesではタウンから読む・Artifactでは読めなくてよい）。
+const leftover = (html.match(/<script src="([^"]+)"/g) || []).filter(t => !/src="https:\/\//.test(t));
+if (leftover.length) { console.error("インライン化できていない script が残っています", leftover); process.exit(1); }
 fs.writeFileSync(path.join(root, "index.html"), html);
 const kb = (Buffer.byteLength(html) / 1024).toFixed(0);
 console.log(`index.html を生成: ${kb}KB`);
