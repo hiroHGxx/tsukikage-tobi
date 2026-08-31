@@ -1761,13 +1761,23 @@ const ICON = {
 
     // 右: 金枠のスタッツ箱（段・最高）＋いまの御霊の顔
     var faceR = 19, faceX = W - 16 - faceR;
-    // 「さいこう」は16pxで実測70px。旧 150px 幅では右へ4px溢れていた
-    var boxW = 176, boxH = 50, boxX = faceX - faceR - 10 - boxW, boxY = 14;
+    // 幅は**中身を測ってから**決める（天候・会心の札と同じ作法）。
+    // 旧150px幅では「さいこう」(16px＝実測70px)が4px溢れ、176pxの決め打ちに直したが
+    // それも余白ちょうどで、文字を1字足せばまた破れる形だった。決め打ちをここでもやめる。
+    var colGap = 26, padX = 14;
+    ctx.font = "500 16px " + MINCHO;
+    var w1 = ctx.measureText("だん").width + 2.0;
+    var w2 = ctx.measureText("さいこう").width + 2.0 * 3;
+    ctx.font = "800 20px " + ROUND;
+    var n1 = ctx.measureText(String(s.step)).width, n2 = ctx.measureText(String(best)).width;
+    var c1 = Math.max(w1, n1), c2 = Math.max(w2, n2);
+    var boxW = padX + c1 + colGap + c2 + padX, boxH = 50;
+    var boxX = faceX - faceR - 10 - boxW, boxY = 14;
     panel(boxX, boxY, boxW, boxH, 8);
-    label("だん", boxX + 14, boxY + 20, "left");
-    num(s.step, boxX + 14, boxY + 42, 20, C.ink, "left");
-    label("さいこう", boxX + 96, boxY + 20, "left");
-    num(best, boxX + 96, boxY + 42, 20, C.inkDim, "left");
+    label("だん", boxX + padX, boxY + 20, "left");
+    num(s.step, boxX + padX, boxY + 42, 20, C.ink, "left");
+    label("さいこう", boxX + padX + c1 + colGap, boxY + 20, "left");
+    num(best, boxX + padX + c1 + colGap, boxY + 42, 20, C.inkDim, "left");
 
     var id = currentChar(), ic = icons[id];
     ctx.save();
