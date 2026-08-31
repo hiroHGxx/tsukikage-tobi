@@ -759,9 +759,15 @@
   window.addEventListener("pointerup", up);
   window.addEventListener("keydown", function (e) { if (e.code === "Space" && !e.repeat) down(e); });
   window.addEventListener("keyup", function (e) { if (e.code === "Space") up(e); });
-  // iOS: ピンチ・ダブルタップズームを止める
+  // iOS: ピンチ・ダブルタップズームを止める。
+  // ただし**等倍のときだけ**抑止する。無条件に塞ぐと、一度ズームしたあと縮めるピンチまで
+  // 塞がれて出口が無くなる（御霊おとしで実機報告あり。本作は試しモードが題字の3連打なので
+  // ズームを踏む機会がむしろ多い）。visualViewport が無い環境は 1 とみなす＝従来どおり常に抑止。
   ["gesturestart", "gesturechange", "gestureend"].forEach(function (n) {
-    document.addEventListener(n, function (e) { e.preventDefault(); }, { passive: false });
+    document.addEventListener(n, function (e) {
+      var sc = (window.visualViewport && window.visualViewport.scale) || 1;
+      if (sc <= 1.01) e.preventDefault();
+    }, { passive: false });
   });
   document.addEventListener("dblclick", function (e) { e.preventDefault(); }, { passive: false });
 

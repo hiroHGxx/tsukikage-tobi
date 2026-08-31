@@ -61,12 +61,16 @@ for (const k of VOICE_KEYS) {
 if (missing.length) console.log(`  ※ 未収録のボイス: ${missing.join(", ")}（鳴らないだけで動く）`);
 
 // page.html から <style> と本文だけを取り出す（head/body は公開時に付く）
+// 先頭の <meta charset> だけは自分で書き戻す。公開時に付く head には charset が無く、
+// 非ASCIIを含む <title> が先頭に来ると閲覧側が文字コードを誤推測する
+// （御霊おとしが2026-08-29に IBM866 と読まれて全文字化けした。中身が変わると推測結果も変わる）
 const page = read("src/page.html");
 const style = page.match(/<style>([\s\S]*?)<\/style>/)[1];
 // <body> の中身（タイトル札・帳・canvas）をそのまま持ってくる。script タグは除く
 const body = page.match(/<body>([\s\S]*?)<script/)[1].trim();
 
-const html = `<title>月影とび</title>
+const html = `<meta charset="utf-8">
+<title>月影とび</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@500;700;800&family=M+PLUS+Rounded+1c:wght@800&display=swap" rel="stylesheet">
